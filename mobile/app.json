@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "DokanWala",
+    "slug": "dokanwala",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "dokanwala",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.dokanwala.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F766E"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-localization"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

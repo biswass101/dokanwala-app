@@ -1,0 +1,71 @@
+{
+  "app": {
+    "name": "DokanWala",
+    "subtitle": "Smart Grocery & Pan-Supari Shop Management",
+    "languageToggle": "বাংলা",
+    "languageName": "English"
+  },
+  "tabs": {
+    "home": "Home",
+    "sales": "Sales",
+    "products": "Products",
+    "reports": "Reports",
+    "more": "More"
+  },
+  "common": {
+    "loading": "Loading...",
+    "retry": "Try Again",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "searchPlaceholder": "Search product name or barcode...",
+    "emptyTitle": "No data yet",
+    "errorTitle": "Something went wrong",
+    "errorFallback": "An unexpected issue occurred. Please try again.",
+    "phaseBadge": "Scheduled in upcoming phase"
+  },
+  "sync": {
+    "synced": "All data synced",
+    "pending": "Pending ({{count}})",
+    "syncing": "Syncing...",
+    "conflict": "Conflicts ({{count}})"
+  },
+  "home": {
+    "welcomeTitle": "DokanWala Foundation Ready",
+    "welcomeDesc": "Bangla-first i18n, bundled Bengali typography, and mobile design system are active.",
+    "backendStatusTitle": "Server & Database Connection",
+    "statusOnline": "Connected",
+    "statusOffline": "Unreachable",
+    "databaseConnected": "PostgreSQL Connected",
+    "databaseDisconnected": "Database Disconnected",
+    "checkConnection": "Check Connection",
+    "banglaInputLabel": "Bangla Digit Input Test (e.g. ২৫০.৫০ or 250.50)",
+    "banglaInputPlaceholder": "Enter amount or quantity (e.g. ১২৫০)",
+    "normalizedPreview": "Calculated BDT value: {{value}}",
+    "quickActionsTitle": "Quick Actions (Foundation Shell)",
+    "actions": {
+      "newSale": "New Sale",
+      "addProduct": "Add Product",
+      "purchase": "Purchase Stock",
+      "expense": "Add Expense",
+      "collectDue": "Collect Due"
+    }
+  },
+  "placeholders": {
+    "salesTitle": "Sales & POS Counter",
+    "salesDesc": "Fast checkout for Pan, Supari, Jorda & groceries with Cash/bKash/Nagad/Baki arrives in Phase 4.",
+    "productsTitle": "Products & Inventory",
+    "productsDesc": "Bangla/English catalog, flexible units (Bira/Piece/Kg/Gram), and wastage tracking arrive in Phase 3.",
+    "reportsTitle": "Profit & Loss Reports",
+    "reportsDesc": "Daily/monthly sales, cashbook, gross/net profit, and Bangla CSV/PDF exports arrive in Phases 7 & 9.",
+    "moreTitle": "More Management & Settings",
+    "moreDesc": "Customer Baki ledger, Suppliers, Expenses, PIN security, Language & Backups arrive across Phases 2–9."
+  },
+  "errors": {
+    "VALIDATION_ERROR": "Please check the entered details and try again.",
+    "UNAUTHORIZED": "Your session has expired. Please sign in again.",
+    "INSUFFICIENT_STOCK": "Insufficient stock available.",
+    "NETWORK_ERROR": "Unable to reach the server right now.",
+    "INTERNAL_ERROR": "A temporary server error occurred."
+  }
+}

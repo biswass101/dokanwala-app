@@ -15,15 +15,15 @@
 - [x] Define offline-first SQLite outbox + idempotent sync protocol ([`04-offline-sync-design.md`](./04-offline-sync-design.md))
 - [x] Define security architecture, RBAC, offline PIN unlock, and residual risks ([`05-security-architecture.md`](./05-security-architecture.md))
 - [x] Define design system, Bangla typography, numeral/date utilities, and navigation ([`06-design-system-and-bangla-ux.md`](./06-design-system-and-bangla-ux.md))
-- [ ] **Awaiting user sign-off on Phase 0 & 4 architectural questions**
+- [x] **Phase 0 approved by user to proceed; 4 optional business-policy questions remain open for Phase 2–4 confirmation**
 
 ### Phase 1 — Project Foundation
-- [ ] Initialize root npm workspace, `.gitignore`, `.editorconfig`, `docker-compose.yml` (Postgres on `5433`, test Postgres on `5434`)
-- [ ] Initialize `packages/shared` (strict TS, `decimal.js` Poisha money math, Bangla numeral normalizer & BDT formatter, unit conversion math, unit tests)
-- [ ] Initialize `backend/` (Express 5 + strict TS, Prisma + PostgreSQL, Zod env config, Pino logger with redaction, Helmet/CORS/RateLimit, centralized error handler, `/api/v1/health` endpoint, Supertest smoke test)
-- [ ] Initialize `mobile/` (Expo SDK 58 + Expo Router + NativeWind v4 + Tailwind v3.4 + strict TS, `Noto Sans Bengali` & `Inter` fonts, `i18next` `bn`/`en` foundation, Axios client skeleton, 5-tab navigation shell, initial UI Design System primitives: `Button`, `Card`, `Input`, `NumericInput`, `LoadingView`, `EmptyState`, `ErrorState`)
-- [ ] Configure ESLint + Prettier across all workspaces + root `README.md` setup guide
-- [ ] Pass quality gates: `typecheck`, `lint`, unit tests, Supertest `/health`, RNTL component tests
+- [x] Initialize root npm workspace, `.gitignore`, `.editorconfig`, `docker-compose.yml` (Postgres on `5433`, test Postgres on `5434`)
+- [x] Initialize `packages/shared` (strict TS, `decimal.js` Poisha money math, Bangla numeral normalizer & BDT formatter, unit conversion math, unit tests)
+- [x] Initialize `backend/` (Express 5 + strict TS, Prisma + PostgreSQL, Zod env config, Pino logger with redaction, Helmet/CORS/RateLimit, centralized error handler, `/api/v1/health` endpoint, Supertest smoke test)
+- [x] Initialize `mobile/` (Expo SDK 58 + Expo Router + NativeWind v4 + Tailwind v3.4 + strict TS, `Noto Sans Bengali` & `Inter` fonts, `i18next` `bn`/`en` foundation, Axios client skeleton, 5-tab navigation shell, initial UI Design System primitives: `Button`, `Card`, `Input`, `NumericInput`, `LoadingView`, `EmptyState`, `ErrorState`)
+- [x] Configure ESLint + Prettier across all workspaces + root `README.md` setup guide
+- [x] Pass quality gates: `typecheck`, `lint`, unit tests, Supertest `/health`, RNTL component tests
 
 ### Phase 2 — Authentication and Shop Setup
 - [ ] Prisma schema & initial migration for `Shop`, `User`, `RefreshSession`, `AuditLog`

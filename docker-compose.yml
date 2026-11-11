@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dokanwala-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dokanwala}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dokanwala_dev_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-dokanwala_dev}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - dokanwala_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dokanwala} -d ${POSTGRES_DB:-dokanwala_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: dokanwala-postgres-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_TEST_USER:-dokanwala}
+      POSTGRES_PASSWORD: ${POSTGRES_TEST_PASSWORD:-dokanwala_test_pass}
+      POSTGRES_DB: ${POSTGRES_TEST_DB:-dokanwala_test}
+    ports:
+      - "${POSTGRES_TEST_PORT:-5434}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_TEST_USER:-dokanwala} -d ${POSTGRES_TEST_DB:-dokanwala_test}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dokanwala_pgdata:

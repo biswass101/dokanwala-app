@@ -1,0 +1,6 @@
+node_modules
+dist
+coverage
+.expo
+backend/src/generated
+backend/prisma/migrations

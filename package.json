@@ -1,0 +1,33 @@
+{
+  "name": "dokanwala",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DokanWala (দোকানওয়ালা) — Smart Grocery Shop Management System for Bangladesh",
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "mobile"
+  ],
+  "scripts": {
+    "build:shared": "npm --workspace=packages/shared run build",
+    "dev:backend": "npm run build:shared && npm --workspace=backend run dev",
+    "dev:mobile": "npm run build:shared && npm --workspace=mobile run start",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "typecheck": "npm run build:shared && npm --workspace=backend run typecheck && npm --workspace=mobile run typecheck",
+    "lint": "npm --workspace=packages/shared run lint && npm --workspace=backend run lint && npm --workspace=mobile run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "test:shared": "npm --workspace=packages/shared run test",
+    "test:backend": "npm run build:shared && npm --workspace=backend run test",
+    "test:mobile": "npm --workspace=mobile run test",
+    "test": "npm run test:shared && npm run test:backend && npm run test:mobile"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

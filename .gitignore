@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/.env
+mobile/.env
+
+# Build outputs
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Prisma generated client (regenerated via prisma generate)
+backend/src/generated/
+
+# Expo & React Native
+.expo/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.metro-health-check*
+
+# Logs & OS
+logs/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

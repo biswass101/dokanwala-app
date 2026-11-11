@@ -1,0 +1,17 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Phase 1 foundation metadata table; full business entities are added incrementally in Phases 2-8.
+model SystemMetadata {
+  key       String   @id @db.VarChar(100)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("system_metadata")
+}
