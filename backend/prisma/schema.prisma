@@ -68,6 +68,20 @@ enum RefundMethod {
   CREDIT_ADJUSTMENT
 }
 
+enum PurchaseStatus {
+  COMPLETED
+  PARTIALLY_RETURNED
+  RETURNED
+}
+
+enum PurchaseRefundMethod {
+  CASH
+  BKASH
+  NAGAD
+  OTHER
+  PAYABLE_ADJUSTMENT
+}
+
 model SystemMetadata {
   key       String   @id @db.VarChar(100)
   value     String   @db.Text
@@ -107,12 +121,18 @@ model Shop {
   inventoryBalances InventoryBalance[]
   stockMovements    StockMovement[]
   stockAdjustments  StockAdjustment[]
-  customers         Customer[]
-  sales             Sale[]
-  saleItems         SaleItem[]
-  payments          Payment[]
-  saleReturns       SaleReturn[]
-  saleReturnItems   SaleReturnItem[]
+  customers           Customer[]
+  sales               Sale[]
+  saleItems           SaleItem[]
+  payments            Payment[]
+  saleReturns         SaleReturn[]
+  saleReturnItems     SaleReturnItem[]
+  suppliers           Supplier[]
+  purchases           Purchase[]
+  purchaseItems       PurchaseItem[]
+  purchaseReturns     PurchaseReturn[]
+  purchaseReturnItems PurchaseReturnItem[]
+  supplierPayments    SupplierPayment[]
 
   @@map("shops")
 }
@@ -139,9 +159,12 @@ model User {
   auditLogs           AuditLog[]
   stockMovements      StockMovement[]
   stockAdjustments    StockAdjustment[]
-  salesRecorded       Sale[]            @relation("SaleActorUser")
-  salesCancelled      Sale[]            @relation("SaleCancelledByUser")
-  saleReturnsRecorded SaleReturn[]
+  salesRecorded           Sale[]            @relation("SaleActorUser")
+  salesCancelled          Sale[]            @relation("SaleCancelledByUser")
+  saleReturnsRecorded     SaleReturn[]
+  purchasesRecorded       Purchase[]        @relation("PurchaseActorUser")
+  purchaseReturnsRecorded PurchaseReturn[]
+  supplierPayments        SupplierPayment[]
 
   @@index([shopId, isActive])
   @@map("users")
@@ -224,6 +247,7 @@ model Unit {
   defaultPurchaseUnitProducts Product[]     @relation("ProductDefaultPurchaseUnit")
   productUnits                ProductUnit[]
   saleItems                   SaleItem[]
+  purchaseItems               PurchaseItem[]
 
   @@unique([shopId, code])
   @@index([shopId])
@@ -262,6 +286,8 @@ model Product {
   stockAdjustments    StockAdjustment[]
   saleItems           SaleItem[]
   saleReturnItems     SaleReturnItem[]
+  purchaseItems       PurchaseItem[]
+  purchaseReturnItems PurchaseReturnItem[]
 
   @@index([shopId, isActive, deletedAt])
   @@index([shopId, categoryId])
@@ -519,4 +545,174 @@ model SaleReturnItem {
   @@index([saleReturnId])
   @@index([saleItemId])
   @@map("sale_return_items")
+}
+
+model Supplier {
+  id                   String    @id @default(uuid()) @db.Uuid
+  shopId               String    @map("shop_id") @db.Uuid
+  nameBn               String    @map("name_bn") @db.VarChar(150)
+  nameEn               String?   @map("name_en") @db.VarChar(150)
+  phone                String?   @db.VarChar(20)
+  address              String?   @db.VarChar(300)
+  note                 String?   @db.VarChar(300)
+  totalPurchasedPoisha Int       @default(0) @map("total_purchased_poisha")
+  totalPaidPoisha      Int       @default(0) @map("total_paid_poisha")
+  payablePoisha        Int       @default(0) @map("payable_poisha")
+  isActive             Boolean   @default(true) @map("is_active")
+  deletedAt            DateTime? @map("deleted_at")
+  version              Int       @default(1)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  shop      Shop              @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  purchases Purchase[]
+  payments  SupplierPayment[]
+
+  @@index([shopId, isActive, deletedAt])
+  @@index([shopId, payablePoisha])
+  @@index([shopId, phone])
+  @@map("suppliers")
+}
+
+model Purchase {
+  id                   String         @id @default(uuid()) @db.Uuid
+  shopId               String         @map("shop_id") @db.Uuid
+  purchaseNumber       String         @map("purchase_number") @db.VarChar(40)
+  supplierId           String?        @map("supplier_id") @db.Uuid
+  supplierNameSnapshot String?        @map("supplier_name_snapshot") @db.VarChar(150)
+  status               PurchaseStatus @default(COMPLETED)
+  subtotalPoisha       Int            @map("subtotal_poisha")
+  discountPoisha       Int            @default(0) @map("discount_poisha")
+  totalPoisha          Int            @map("total_poisha")
+  paidPoisha           Int            @default(0) @map("paid_poisha")
+  settledDuePoisha     Int            @default(0) @map("settled_due_poisha")
+  duePoisha            Int            @default(0) @map("due_poisha")
+  paymentMethod        PaymentMethod? @map("payment_method")
+  paymentReference     String?        @map("payment_reference") @db.VarChar(120)
+  returnedTotalPoisha  Int            @default(0) @map("returned_total_poisha")
+  cashRefundedPoisha   Int            @default(0) @map("cash_refunded_poisha")
+  note                 String?        @db.VarChar(300)
+  idempotencyKey       String?        @map("idempotency_key") @db.VarChar(120)
+  actorUserId          String?        @map("actor_user_id") @db.Uuid
+  purchasedAt          DateTime       @default(now()) @map("purchased_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  shop             Shop              @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  supplier         Supplier?         @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  actorUser        User?             @relation("PurchaseActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  items            PurchaseItem[]
+  returns          PurchaseReturn[]
+  supplierPayments SupplierPayment[]
+
+  @@unique([shopId, purchaseNumber])
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, purchasedAt(sort: Desc), status])
+  @@index([shopId, supplierId, purchasedAt(sort: Desc)])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id                     String   @id @default(uuid()) @db.Uuid
+  shopId                 String   @map("shop_id") @db.Uuid
+  purchaseId             String   @map("purchase_id") @db.Uuid
+  productId              String   @map("product_id") @db.Uuid
+  unitId                 String   @map("unit_id") @db.Uuid
+  productNameBn          String   @map("product_name_bn") @db.VarChar(180)
+  productNameEn          String?  @map("product_name_en") @db.VarChar(180)
+  unitNameBn             String   @map("unit_name_bn") @db.VarChar(60)
+  unitNameEn             String   @map("unit_name_en") @db.VarChar(60)
+  lineOrder              Int      @default(0) @map("line_order")
+  qtyDisplay             Decimal  @map("qty_display") @db.Decimal(15, 4)
+  conversionFactorToBase Decimal  @map("conversion_factor_to_base") @db.Decimal(15, 4)
+  qtyBase                Decimal  @map("qty_base") @db.Decimal(15, 4)
+  returnedQtyBase        Decimal  @default(0) @map("returned_qty_base") @db.Decimal(15, 4)
+  unitCostPoisha         Int      @map("unit_cost_poisha")
+  lineTotalPoisha        Int      @map("line_total_poisha")
+  netCostPoisha          Int      @map("net_cost_poisha")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  shop        Shop                 @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  purchase    Purchase             @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  product     Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unit        Unit                 @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  returnItems PurchaseReturnItem[]
+
+  @@index([purchaseId, lineOrder])
+  @@index([shopId, productId, createdAt])
+  @@map("purchase_items")
+}
+
+model PurchaseReturn {
+  id                       String               @id @default(uuid()) @db.Uuid
+  shopId                   String               @map("shop_id") @db.Uuid
+  purchaseId               String               @map("purchase_id") @db.Uuid
+  returnNumber             String               @map("return_number") @db.VarChar(40)
+  refundMethod             PurchaseRefundMethod @map("refund_method")
+  subtotalPoisha           Int                  @map("subtotal_poisha")
+  discountAdjustmentPoisha Int                  @default(0) @map("discount_adjustment_poisha")
+  refundTotalPoisha        Int                  @map("refund_total_poisha")
+  cashRefundPoisha         Int                  @default(0) @map("cash_refund_poisha")
+  payableAdjustedPoisha    Int                  @default(0) @map("payable_adjusted_poisha")
+  reason                   String?              @db.VarChar(300)
+  idempotencyKey           String?              @map("idempotency_key") @db.VarChar(120)
+  actorUserId              String?              @map("actor_user_id") @db.Uuid
+  returnedAt               DateTime             @default(now()) @map("returned_at")
+
+  shop      Shop                 @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  purchase  Purchase             @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  actorUser User?                @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  items     PurchaseReturnItem[]
+
+  @@unique([shopId, returnNumber])
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, purchaseId, returnedAt(sort: Desc)])
+  @@map("purchase_returns")
+}
+
+model PurchaseReturnItem {
+  id                 String  @id @default(uuid()) @db.Uuid
+  shopId             String  @map("shop_id") @db.Uuid
+  purchaseReturnId   String  @map("purchase_return_id") @db.Uuid
+  purchaseItemId     String  @map("purchase_item_id") @db.Uuid
+  productId          String  @map("product_id") @db.Uuid
+  qtyDisplay         Decimal @map("qty_display") @db.Decimal(15, 4)
+  qtyBase            Decimal @map("qty_base") @db.Decimal(15, 4)
+  unitCostPoisha     Int     @map("unit_cost_poisha")
+  lineRefundPoisha   Int     @map("line_refund_poisha")
+  reversedCostPoisha Int     @map("reversed_cost_poisha")
+
+  shop           Shop           @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Restrict)
+  purchaseItem   PurchaseItem   @relation(fields: [purchaseItemId], references: [id], onDelete: Restrict)
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseReturnId])
+  @@index([purchaseItemId])
+  @@map("purchase_return_items")
+}
+
+model SupplierPayment {
+  id             String        @id @default(uuid()) @db.Uuid
+  shopId         String        @map("shop_id") @db.Uuid
+  supplierId     String        @map("supplier_id") @db.Uuid
+  purchaseId     String?       @map("purchase_id") @db.Uuid
+  method         PaymentMethod
+  amountPoisha   Int           @map("amount_poisha")
+  reference      String?       @db.VarChar(120)
+  note           String?       @db.VarChar(300)
+  idempotencyKey String?       @map("idempotency_key") @db.VarChar(120)
+  actorUserId    String?       @map("actor_user_id") @db.Uuid
+  paidAt         DateTime      @default(now()) @map("paid_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  shop      Shop      @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  supplier  Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchase  Purchase? @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  actorUser User?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, supplierId, paidAt(sort: Desc)])
+  @@index([shopId, paidAt(sort: Desc), method])
+  @@map("supplier_payments")
 }

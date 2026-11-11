@@ -6,7 +6,8 @@
 
 ## 1. Phase-by-Phase Roadmap & Checklists
 
-### Phase 0 — Project Discovery and Architecture *(Current Phase)*
+### Phase 0 — Project Discovery and Architecture _(Current Phase)_
+
 - [x] Inspect workspace and local environment (Node v24, Docker Compose, Postgres port check)
 - [x] Confirm functional, financial, security, offline-first, and high-priority Bangla requirements
 - [x] Define monorepo, backend, mobile, and `packages/shared` folder structures ([`01-architecture.md`](./01-architecture.md))
@@ -18,6 +19,7 @@
 - [x] **Phase 0 approved by user to proceed; 4 optional business-policy questions remain open for Phase 2–4 confirmation**
 
 ### Phase 1 — Project Foundation
+
 - [x] Initialize root npm workspace, `.gitignore`, `.editorconfig`, `docker-compose.yml` (Postgres on `5433`, test Postgres on `5434`)
 - [x] Initialize `packages/shared` (strict TS, `decimal.js` Poisha money math, Bangla numeral normalizer & BDT formatter, unit conversion math, unit tests)
 - [x] Initialize `backend/` (Express 5 + strict TS, Prisma + PostgreSQL, Zod env config, Pino logger with redaction, Helmet/CORS/RateLimit, centralized error handler, `/api/v1/health` endpoint, Supertest smoke test)
@@ -26,6 +28,7 @@
 - [x] Pass quality gates: `typecheck`, `lint`, unit tests, Supertest `/health`, RNTL component tests
 
 ### Phase 2 — Authentication and Shop Setup
+
 - [x] Prisma schema & initial migration for `Shop`, `User`, `RefreshSession`, `AuditLog` (`20261111203645_phase2_auth_shop`)
 - [x] Argon2id password + PIN hashing, JWT access + hashed rotating refresh tokens with reuse-theft revocation
 - [x] Auth routes (`/register`, `/login`, `/pin-login`, `/refresh`, `/logout`, `/pin`, `/me`) + `OWNER`/`EMPLOYEE` RBAC + `requireAuth`/`requireRole` middleware
@@ -35,30 +38,35 @@
 - [x] Tests: Auth, PIN lockout, token rotation, RBAC isolation, mobile auth forms & offline PIN unlock
 
 ### Phase 3 — Product and Inventory Management
+
 - [x] Prisma migration for `Category`, `Unit`, `Product`, `ProductUnit`, `InventoryBalance`, `StockMovement`, `StockAdjustment` + Bangladeshi seed defaults (Pan, Supari, Jorda, standard Bangla units)
 - [x] Backend CRUD + bilingual NFC search (`nameBn`, `nameEn`, barcode), unit conversions, stock alerts, wastage/damage/expiry recording, inventory valuation
 - [x] Mobile SQLite product/unit/inventory mirror + Product list, Product create/edit with unit conversion builder, Stock adjust & Wastage screens
 - [x] Tests: Fractional unit conversions, wastage loss calculations, soft archiving, RNTL product/unit forms
 
 ### Phase 4 — Sales and POS
+
 - [x] Prisma migration for `Sale`, `SaleItem`, `Payment`, `SaleReturn`, `SaleReturnItem` (plus `Customer` table to enforce credit `বাকি` FKs cleanly) (`20261111215339_phase4_sales_pos`)
 - [x] Backend POS transaction engine (server recalculation, split cash/bKash/Nagad payments, credit `বাকি` validation, WAC COGS snapshot, returns & cancellations, idempotency)
 - [x] Mobile POS screen: fast product search, category chips, frequent items, Zustand cart with unit switching & quick weight/quantity presets, checkout sheet (discounts, split payment, customer `বাকি` selection), Bangla receipt view/share
 - [x] Tests: Fractional weight sales, discounts, split payments, credit sales, partial/full returns, idempotency replay, insufficient stock rollback
 
 ### Phase 5 — Purchases and Suppliers
-- [ ] Prisma migration for `Supplier`, `Purchase`, `PurchaseItem`, `PurchaseReturn`, `SupplierPayment`
-- [ ] Backend purchase transactions (multi-item stock restock, Moving WAC recalculation, supplier payable updates, purchase returns, supplier ledger & payments)
-- [ ] Mobile Suppliers list, Supplier Ledger, Purchase Entry flow (unit-aware), Supplier Payment screen
-- [ ] Tests: Multi-unit purchase WAC recalculation accuracy, supplier payable tracking, purchase return rollback
+
+- [x] Prisma migration for `Supplier`, `Purchase`, `PurchaseItem`, `PurchaseReturn`, `PurchaseReturnItem`, `SupplierPayment` (`20261111223545_phase5_purchases_suppliers`)
+- [x] Backend purchase transactions (multi-item stock restock, Moving WAC recalculation, supplier payable updates, purchase returns, supplier ledger & payments)
+- [x] Mobile Suppliers list, Supplier Ledger, Purchase Entry flow (unit-aware), Purchase Detail & Returns, Supplier Payment screen
+- [x] Tests: Multi-unit purchase WAC recalculation accuracy, supplier payable tracking, purchase return rollback
 
 ### Phase 6 — Customers and Expenses
+
 - [ ] Prisma migration for `Customer`, `CustomerPayment`, `ExpenseCategory`, `Expense`, `ExpenseAuditLog`
 - [ ] Backend Customer CRUD, Customer Ledger, Due Collection (`CustomerPayment` reducing receivable without creating duplicate revenue), Expense categories, Expenses with `ExpenseAuditLog`
 - [ ] Mobile Customers (`বাকি খাতা`), Collect Due flow, Expense list with category/date filters, Add/Edit Expense + audit history viewer
 - [ ] Tests: Credit sale -> due collection accounting invariant, expense edit audit trail, filter queries
 
 ### Phase 7 — Cashbook and Financial Reporting
+
 - [ ] Prisma migration for `CashbookSession`, `CashbookEntry` (and backfill/link ledger flows cleanly)
 - [ ] Backend Daily Cashbook (opening cash, inflows/outflows by Cash/bKash/Nagad, closing count & variance)
 - [ ] Backend Reports in `Asia/Dhaka` boundaries: Dashboard KPIs, Daily/Weekly/Monthly Sales, Product Performance, Inventory Valuation, Profit & Loss (accounting for discounts, returns, COGS, wastage, expenses)
@@ -66,12 +74,14 @@
 - [ ] Automated financial reconciliation & P&L verification test suite covering every edge case in `requirements.md` Section 10
 
 ### Phase 8 — Offline Synchronization
+
 - [ ] Prisma `SyncOperation` & monotonic `syncSeq` delta support (`POST /sync/push`, `GET /sync/pull`)
 - [ ] Mobile SQLite full transactional local writes + `sync_outbox` queue + causal dependency ordering + crash recovery
 - [ ] Background/NetInfo sync worker + exponential backoff + Conflict resolution UI (`CONFLICT` inspector) + persistent Sync Status Pill
 - [ ] Tests: Offline sale -> restart -> reconnect -> idempotent push -> delta pull, conflict detection & resolution without silent overwrites
 
 ### Phase 9 — Production Readiness
+
 - [ ] Comprehensive security audit & index performance review (`EXPLAIN ANALYZE` on ledger/report queries)
 - [ ] UTF-8 BOM CSV export & embedded `Noto Sans Bengali` PDF export for reports & receipts
 - [ ] Shop JSON Backup Export & Validated Restore workflow
@@ -92,7 +102,7 @@
 
 ## 3. Essential Questions to Finalize Before Phase 1
 
-1. **Deployment Tenancy & Registration:** Will this backend serve **one shop (1–2 devices: Owner + optional Employee)** with owner/admin-seeded accounts, or should it allow **multiple independent shops to self-register**? *(All tables include `shopId` either way; this decides registration & onboarding UX.)*
+1. **Deployment Tenancy & Registration:** Will this backend serve **one shop (1–2 devices: Owner + optional Employee)** with owner/admin-seeded accounts, or should it allow **multiple independent shops to self-register**? _(All tables include `shopId` either way; this decides registration & onboarding UX.)_
 2. **Default Numeral Display in Bangla Mode:** When Bangla (`bn`) is active, should prices and numbers display in **Bangla digits (`৳ ১,২৫০`)** by default or **English digits (`৳ 1,250`)** by default (with a Settings toggle either way)?
 3. **Negative Stock & Offline Stock Conflict Policy:** If a shopkeeper tries to sell more than recorded stock (e.g., forgot to log a morning purchase, or two devices sold offline simultaneously), should the app **strictly block** the sale, or **warn and allow** (recording negative stock / flagging an Owner discrepancy alert so real customer sales are never blocked at the counter)?
 4. **Employee Permissions (`EMPLOYEE` Role):** Should Employees be permitted to record **credit sales (`বাকি`)** and **apply discounts**, and should **wholesale Cost Price (`ক্রয়মূল্য`) & Profit/Loss** be hidden from Employees (`OWNER`-only)?

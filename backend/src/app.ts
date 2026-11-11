@@ -12,8 +12,10 @@ import { customersRouter } from './modules/customers/customers.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { inventoryRouter } from './modules/inventory/inventory.routes.js';
 import { productsRouter } from './modules/products/products.routes.js';
+import { purchasesRouter } from './modules/purchases/purchases.routes.js';
 import { salesRouter } from './modules/sales/sales.routes.js';
 import { shopRouter } from './modules/shop/shop.routes.js';
+import { suppliersRouter } from './modules/suppliers/suppliers.routes.js';
 import { unitsRouter } from './modules/units/units.routes.js';
 
 export function createApp(): Express {
@@ -77,6 +79,8 @@ export function createApp(): Express {
   v1Router.use('/inventory', inventoryRouter);
   v1Router.use('/customers', customersRouter);
   v1Router.use('/sales', salesRouter);
+  v1Router.use('/suppliers', suppliersRouter);
+  v1Router.use('/purchases', purchasesRouter);
 
   app.use('/api/v1', v1Router);
 

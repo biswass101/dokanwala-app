@@ -183,7 +183,7 @@ export default function HomeScreen() {
           <Button
             label={t('home.actions.purchase')}
             variant="outline"
-            onPress={() => router.push('/(tabs)/more')}
+            onPress={() => router.push(user?.role === 'OWNER' ? '/purchases/form' : '/(tabs)/more')}
             style={{ flexGrow: 1 }}
           />
           <Button

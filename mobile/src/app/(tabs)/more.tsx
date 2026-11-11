@@ -55,7 +55,9 @@ export default function MoreScreen() {
 
       {/* Active Shop & User Card */}
       <Card style={{ gap: 8 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+        >
           <View style={{ flex: 1 }}>
             <AppText variant="sectionTitle" weight="bold">
               {shop?.nameBn ?? t('app.name')}
@@ -93,6 +95,24 @@ export default function MoreScreen() {
               variant="outline"
               fullWidth
               onPress={() => router.push('/categories-units')}
+            />
+            <Button
+              label={t('more.newPurchase')}
+              variant="outline"
+              fullWidth
+              onPress={() => router.push('/purchases/form')}
+            />
+            <Button
+              label={t('more.purchases')}
+              variant="outline"
+              fullWidth
+              onPress={() => router.push('/purchases')}
+            />
+            <Button
+              label={t('more.suppliers')}
+              variant="outline"
+              fullWidth
+              onPress={() => router.push('/suppliers')}
             />
           </>
         ) : null}

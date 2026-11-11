@@ -2,13 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
   addPoisha,
   addQuantities,
+  allocatePurchaseNetCostsPoisha,
   bdtToPoisha,
+  calculateBaseUnitPurchaseCostPoisha,
   calculateDiscountPoisha,
+  calculateExpectedUnitPurchaseCostPoisha,
   calculateInventoryValuationPoisha,
   calculateLineCogsPoisha,
   calculateLineTotalPoisha,
   calculateMovingWacBdt,
+  calculateProportionalCostReversedPoisha,
   calculateProportionalReturnDiscount,
+  calculatePurchaseReturnWacBdt,
   compareQuantities,
   convertFromBaseQuantity,
   convertToBaseQuantity,
@@ -21,6 +26,7 @@ import {
   normalizeNumericInput,
   normalizeUnicodeText,
   poishaToBdtString,
+  previewPurchaseItemImpact,
   subtractPoisha,
   subtractQuantities,
   toBanglaDigits,
@@ -144,5 +150,68 @@ describe('POS discount & Dhaka date helpers', () => {
     expect(formatDhakaDate(iso, 'bn', 'bn')).toBe('১২ নভেম্বর ২০২৬');
     expect(formatDhakaDateTime(iso, 'bn', 'bn')).toBe('১২ নভেম্বর ২০২৬, বিকাল ৩:৩০');
     expect(formatDhakaDateTime(iso, 'en', 'en')).toBe('12 Nov 2026, 3:30 PM');
+  });
+});
+
+describe('Purchase & Moving WAC reversal helpers', () => {
+  it('allocates invoice-level purchase discount cleanly with exact penny reconciliation', () => {
+    const netCosts = allocatePurchaseNetCostsPoisha([25000, 427500], 2500);
+    expect(netCosts.reduce((a, b) => a + b, 0)).toBe(450000);
+    expect(netCosts[0]).toBe(24862);
+    expect(netCosts[1]).toBe(425138);
+  });
+
+  it('computes base-unit purchase price and unit suggestion cost cleanly', () => {
+    expect(calculateBaseUnitPurchaseCostPoisha(2500, '20')).toBe(125);
+    expect(calculateBaseUnitPurchaseCostPoisha(85500, '1000')).toBe(86);
+    expect(
+      calculateExpectedUnitPurchaseCostPoisha({
+        avgCostPerBaseBdt: '0.855000',
+        lastPurchasePricePoisha: 86,
+        conversionFactorToBase: '1000',
+      }),
+    ).toBe(85500);
+  });
+
+  it('previews incoming purchase impact and reverses WAC cleanly on supplier returns', () => {
+    const preview = previewPurchaseItemImpact({
+      currentQtyBase: '100.0000',
+      currentAvgCostBdt: '1.000000',
+      qtyDisplay: '5',
+      conversionFactorToBase: '20',
+      unitCostPoisha: 4000, // 40 BDT per 20 pcs = 2 BDT/pc
+    });
+    expect(preview.qtyBase).toBe('100.0000');
+    expect(preview.lineTotalPoisha).toBe(20000);
+    expect(preview.nextQtyBase).toBe('200.0000');
+    expect(preview.nextAvgCostBdt).toBe('1.500000');
+
+    const reversedCost = calculateProportionalCostReversedPoisha({
+      itemNetCostPoisha: 20000,
+      itemQtyBase: '100.0000',
+      returnQtyBase: '100.0000',
+      alreadyReversedCostPoisha: 0,
+      isCompletingItem: true,
+    });
+    expect(reversedCost).toBe(20000);
+
+    // Returning batch 2 restores exact batch 1 WAC (1.000000)
+    const afterReturnWac = calculatePurchaseReturnWacBdt({
+      currentQtyBase: '200.0000',
+      currentAvgCostBdt: '1.500000',
+      returnQtyBase: '100.0000',
+      reversedCostPoisha: reversedCost,
+    });
+    expect(afterReturnWac).toBe('1.000000');
+
+    // Returning all remaining stock zeroes WAC cleanly
+    expect(
+      calculatePurchaseReturnWacBdt({
+        currentQtyBase: '100.0000',
+        currentAvgCostBdt: '1.000000',
+        returnQtyBase: '100.0000',
+        reversedCostPoisha: 10000,
+      }),
+    ).toBe('0.000000');
   });
 });

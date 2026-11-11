@@ -1,6 +1,7 @@
 import type { AuthSessionResponse, AuthUserDto, ShopProfileDto } from '@dokanwala/shared';
 import { create } from 'zustand';
 import { clearLocalCatalogData } from '@/database/repositories/catalog-local.repo';
+import { clearLocalPurchasesData } from '@/database/repositories/purchases-local.repo';
 import { clearLocalSalesData } from '@/database/repositories/sales-local.repo';
 import {
   clearLocalSessionData,
@@ -183,6 +184,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await clearLocalSessionData();
       await clearLocalCatalogData();
       await clearLocalSalesData();
+      await clearLocalPurchasesData();
       useCartStore.getState().clearCart();
       set({
         status: 'unauthenticated',
@@ -219,6 +221,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await clearLocalSessionData();
     await clearLocalCatalogData();
     await clearLocalSalesData();
+    await clearLocalPurchasesData();
     useCartStore.getState().clearCart();
     set({
       status: 'unauthenticated',
