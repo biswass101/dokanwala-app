@@ -22,6 +22,25 @@ enum DigitStyle {
   en
 }
 
+enum StockMovementType {
+  OPENING_STOCK
+  PURCHASE_IN
+  SALE_OUT
+  RETURN_IN
+  PURCHASE_RETURN_OUT
+  COUNT_ADJUST
+  WASTAGE_OUT
+  DAMAGE_OUT
+  EXPIRED_OUT
+}
+
+enum StockAdjustmentType {
+  COUNT_ADJUST
+  WASTAGE
+  DAMAGE
+  EXPIRED
+}
+
 model SystemMetadata {
   key       String   @id @db.VarChar(100)
   value     String   @db.Text
@@ -51,9 +70,16 @@ model Shop {
   createdAt                  DateTime     @default(now()) @map("created_at")
   updatedAt                  DateTime     @updatedAt @map("updated_at")
 
-  users           User[]
-  refreshSessions RefreshSession[]
-  auditLogs       AuditLog[]
+  users             User[]
+  refreshSessions   RefreshSession[]
+  auditLogs         AuditLog[]
+  categories        Category[]
+  units             Unit[]
+  products          Product[]
+  productUnits      ProductUnit[]
+  inventoryBalances InventoryBalance[]
+  stockMovements    StockMovement[]
+  stockAdjustments  StockAdjustment[]
 
   @@map("shops")
 }
@@ -75,9 +101,11 @@ model User {
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
-  shop            Shop             @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  refreshSessions RefreshSession[]
-  auditLogs       AuditLog[]
+  shop             Shop              @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  refreshSessions  RefreshSession[]
+  auditLogs        AuditLog[]
+  stockMovements   StockMovement[]
+  stockAdjustments StockAdjustment[]
 
   @@index([shopId, isActive])
   @@map("users")
@@ -122,4 +150,165 @@ model AuditLog {
 
   @@index([shopId, occurredAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+model Category {
+  id        String    @id @default(uuid()) @db.Uuid
+  shopId    String    @map("shop_id") @db.Uuid
+  nameBn    String    @map("name_bn") @db.VarChar(120)
+  nameEn    String?   @map("name_en") @db.VarChar(120)
+  sortOrder Int       @default(0) @map("sort_order")
+  isActive  Boolean   @default(true) @map("is_active")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  shop     Shop      @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  products Product[]
+
+  @@index([shopId, isActive, deletedAt])
+  @@index([shopId, sortOrder])
+  @@map("categories")
+}
+
+model Unit {
+  id           String   @id @default(uuid()) @db.Uuid
+  shopId       String   @map("shop_id") @db.Uuid
+  code         String   @db.VarChar(30)
+  nameBn       String   @map("name_bn") @db.VarChar(60)
+  nameEn       String   @map("name_en") @db.VarChar(60)
+  isFractional Boolean  @default(false) @map("is_fractional")
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  shop                        Shop          @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  baseUnitProducts            Product[]     @relation("ProductBaseUnit")
+  defaultSaleUnitProducts     Product[]     @relation("ProductDefaultSaleUnit")
+  defaultPurchaseUnitProducts Product[]     @relation("ProductDefaultPurchaseUnit")
+  productUnits                ProductUnit[]
+
+  @@unique([shopId, code])
+  @@index([shopId])
+  @@map("units")
+}
+
+model Product {
+  id                      String    @id @default(uuid()) @db.Uuid
+  shopId                  String    @map("shop_id") @db.Uuid
+  categoryId              String?   @map("category_id") @db.Uuid
+  nameBn                  String    @map("name_bn") @db.VarChar(180)
+  nameEn                  String?   @map("name_en") @db.VarChar(180)
+  barcode                 String?   @db.VarChar(80)
+  imageUrl                String?   @map("image_url") @db.VarChar(500)
+  defaultSupplierName     String?   @map("default_supplier_name") @db.VarChar(150)
+  baseUnitId              String    @map("base_unit_id") @db.Uuid
+  defaultSaleUnitId       String    @map("default_sale_unit_id") @db.Uuid
+  defaultPurchaseUnitId   String    @map("default_purchase_unit_id") @db.Uuid
+  baseSellingPricePoisha  Int       @map("base_selling_price_poisha")
+  lastPurchasePricePoisha Int       @default(0) @map("last_purchase_price_poisha")
+  lowStockThresholdBase   Decimal   @default(0) @map("low_stock_threshold_base") @db.Decimal(15, 4)
+  isActive                Boolean   @default(true) @map("is_active")
+  deletedAt               DateTime? @map("deleted_at")
+  version                 Int       @default(1)
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  shop                Shop              @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  category            Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  baseUnit            Unit              @relation("ProductBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict)
+  defaultSaleUnit     Unit              @relation("ProductDefaultSaleUnit", fields: [defaultSaleUnitId], references: [id], onDelete: Restrict)
+  defaultPurchaseUnit Unit              @relation("ProductDefaultPurchaseUnit", fields: [defaultPurchaseUnitId], references: [id], onDelete: Restrict)
+  productUnits        ProductUnit[]
+  inventoryBalance    InventoryBalance?
+  stockMovements      StockMovement[]
+  stockAdjustments    StockAdjustment[]
+
+  @@index([shopId, isActive, deletedAt])
+  @@index([shopId, categoryId])
+  @@index([shopId, barcode])
+  @@map("products")
+}
+
+model ProductUnit {
+  id                     String   @id @default(uuid()) @db.Uuid
+  shopId                 String   @map("shop_id") @db.Uuid
+  productId              String   @map("product_id") @db.Uuid
+  unitId                 String   @map("unit_id") @db.Uuid
+  conversionFactorToBase Decimal  @map("conversion_factor_to_base") @db.Decimal(15, 4)
+  sellingPricePoisha     Int?     @map("selling_price_poisha")
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  shop    Shop    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unit    Unit    @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, unitId])
+  @@index([shopId, productId])
+  @@map("product_units")
+}
+
+model InventoryBalance {
+  productId         String   @id @map("product_id") @db.Uuid
+  shopId            String   @map("shop_id") @db.Uuid
+  qtyBase           Decimal  @default(0) @map("qty_base") @db.Decimal(15, 4)
+  avgCostPerBaseBdt Decimal  @default(0) @map("avg_cost_per_base_bdt") @db.Decimal(18, 6)
+  version           Int      @default(1)
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  shop    Shop    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([shopId])
+  @@map("inventory_balances")
+}
+
+model StockMovement {
+  id               String            @id @default(uuid()) @db.Uuid
+  shopId           String            @map("shop_id") @db.Uuid
+  productId        String            @map("product_id") @db.Uuid
+  movementType     StockMovementType @map("movement_type")
+  deltaQtyBase     Decimal           @map("delta_qty_base") @db.Decimal(15, 4)
+  balanceAfterBase Decimal           @map("balance_after_base") @db.Decimal(15, 4)
+  unitCostBdt      Decimal           @map("unit_cost_bdt") @db.Decimal(18, 6)
+  valuePoisha      Int               @map("value_poisha")
+  referenceType    String?           @map("reference_type") @db.VarChar(40)
+  referenceId      String?           @map("reference_id") @db.VarChar(80)
+  reason           String?           @db.VarChar(300)
+  actorUserId      String?           @map("actor_user_id") @db.Uuid
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  actorUser User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([shopId, productId, createdAt(sort: Desc)])
+  @@index([shopId, movementType, createdAt(sort: Desc)])
+  @@map("stock_movements")
+}
+
+model StockAdjustment {
+  id             String              @id @default(uuid()) @db.Uuid
+  shopId         String              @map("shop_id") @db.Uuid
+  productId      String              @map("product_id") @db.Uuid
+  adjustmentType StockAdjustmentType @map("adjustment_type")
+  qtyBase        Decimal             @map("qty_base") @db.Decimal(15, 4)
+  deltaQtyBase   Decimal             @map("delta_qty_base") @db.Decimal(15, 4)
+  unitCostBdt    Decimal             @map("unit_cost_bdt") @db.Decimal(18, 6)
+  lossPoisha     Int                 @map("loss_poisha")
+  reason         String?             @db.VarChar(300)
+  idempotencyKey String?             @map("idempotency_key") @db.VarChar(120)
+  actorUserId    String?             @map("actor_user_id") @db.Uuid
+  adjustedAt     DateTime            @default(now()) @map("adjusted_at")
+
+  shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  actorUser User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, productId, adjustedAt(sort: Desc)])
+  @@index([shopId, adjustmentType, adjustedAt(sort: Desc)])
+  @@map("stock_adjustments")
 }

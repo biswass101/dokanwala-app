@@ -88,6 +88,12 @@ export default function MoreScreen() {
               fullWidth
               onPress={() => router.push('/staff')}
             />
+            <Button
+              label={t('more.categoriesUnits')}
+              variant="outline"
+              fullWidth
+              onPress={() => router.push('/categories-units')}
+            />
           </>
         ) : null}
 

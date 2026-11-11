@@ -114,6 +114,27 @@ export function calculateLineCogsPoisha(
 }
 
 /**
+ * Calculates current inventory valuation in poisha from remaining stock and WAC.
+ * Returns 0 when stock balance is zero or negative.
+ */
+export function calculateInventoryValuationPoisha(
+  qtyBase: string | number | Decimal,
+  avgCostPerBaseBdt: string | number | Decimal,
+): number {
+  const qtyDec = toDecimal(qtyBase);
+  const avgCostDec = toDecimal(avgCostPerBaseBdt);
+  if (qtyDec.lte(0) || avgCostDec.lte(0)) {
+    return 0;
+  }
+  const result = qtyDec
+    .times(avgCostDec)
+    .times(POISHA_PER_BDT)
+    .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+    .toNumber();
+  return assertSafePoisha(result);
+}
+
+/**
  * Calculates Moving Weighted-Average Cost (WAC) per base unit in BDT (6 decimal places).
  */
 export function calculateMovingWacBdt(params: {

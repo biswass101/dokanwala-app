@@ -194,17 +194,35 @@ apiClient.interceptors.response.use(
   },
 );
 
-export async function unwrapApiGet<T>(url: string): Promise<T> {
-  const response = await apiClient.get<ApiSuccessResponse<T>>(url);
+export async function unwrapApiGet<T>(url: string, params?: Record<string, unknown>): Promise<T> {
+  const response = await apiClient.get<ApiSuccessResponse<T>>(url, params ? { params } : undefined);
   return response.data.data;
 }
 
-export async function unwrapApiPost<T>(url: string, body?: unknown): Promise<T> {
-  const response = await apiClient.post<ApiSuccessResponse<T>>(url, body);
+export async function unwrapApiPost<T>(
+  url: string,
+  body?: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
+  const response = await apiClient.post<ApiSuccessResponse<T>>(
+    url,
+    body,
+    headers ? { headers } : undefined,
+  );
   return response.data.data;
 }
 
 export async function unwrapApiPatch<T>(url: string, body?: unknown): Promise<T> {
   const response = await apiClient.patch<ApiSuccessResponse<T>>(url, body);
+  return response.data.data;
+}
+
+export async function unwrapApiPut<T>(url: string, body?: unknown): Promise<T> {
+  const response = await apiClient.put<ApiSuccessResponse<T>>(url, body);
+  return response.data.data;
+}
+
+export async function unwrapApiDelete<T>(url: string): Promise<T> {
+  const response = await apiClient.delete<ApiSuccessResponse<T>>(url);
   return response.data.data;
 }

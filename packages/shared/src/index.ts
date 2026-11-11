@@ -4,5 +4,6 @@ export * from './money/format-bdt.js';
 export * from './money/poisha.js';
 export * from './types/api.js';
 export * from './types/auth.js';
+export * from './types/catalog.js';
 export * from './units/conversion.js';
 export * from './validation/bangla-input.js';

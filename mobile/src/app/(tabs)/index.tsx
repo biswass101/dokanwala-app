@@ -175,7 +175,9 @@ export default function HomeScreen() {
           <Button
             label={t('home.actions.addProduct')}
             variant="secondary"
-            onPress={() => router.push('/(tabs)/products')}
+            onPress={() =>
+              router.push(user?.role === 'OWNER' ? '/products/form' : '/(tabs)/products')
+            }
             style={{ flexGrow: 1 }}
           />
           <Button

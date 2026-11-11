@@ -52,3 +52,41 @@ export function convertFromBaseQuantity(
     .toDecimalPlaces(QTY_DECIMAL_PLACES, Decimal.ROUND_HALF_UP)
     .toFixed(QTY_DECIMAL_PLACES);
 }
+
+function parseQtyDecimal(value: string | number): Decimal {
+  const dec = new Decimal(typeof value === 'number' ? value : normalizeNumericInput(value));
+  if (!dec.isFinite()) {
+    throw new Error('Quantity must be a finite number');
+  }
+  return dec;
+}
+
+export function addQuantities(a: string | number, b: string | number): string {
+  return parseQtyDecimal(a)
+    .plus(parseQtyDecimal(b))
+    .toDecimalPlaces(QTY_DECIMAL_PLACES, Decimal.ROUND_HALF_UP)
+    .toFixed(QTY_DECIMAL_PLACES);
+}
+
+export function subtractQuantities(a: string | number, b: string | number): string {
+  return parseQtyDecimal(a)
+    .minus(parseQtyDecimal(b))
+    .toDecimalPlaces(QTY_DECIMAL_PLACES, Decimal.ROUND_HALF_UP)
+    .toFixed(QTY_DECIMAL_PLACES);
+}
+
+export function compareQuantities(a: string | number, b: string | number): -1 | 0 | 1 {
+  const cmp = parseQtyDecimal(a).comparedTo(parseQtyDecimal(b));
+  if (cmp < 0) return -1;
+  if (cmp > 0) return 1;
+  return 0;
+}
+
+export function formatQuantityDisplay(qty: string | number, maxDecimals = 3): string {
+  const dec = parseQtyDecimal(qty).toDecimalPlaces(maxDecimals, Decimal.ROUND_HALF_UP);
+  const fixed = dec.toFixed(maxDecimals);
+  if (!fixed.includes('.')) {
+    return fixed;
+  }
+  return fixed.replace(/\.?0+$/, '');
+}

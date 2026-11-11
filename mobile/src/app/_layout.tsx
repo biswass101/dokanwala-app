@@ -80,6 +80,11 @@ function AuthNavigationGate() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="shop-settings" />
       <Stack.Screen name="staff" />
+      <Stack.Screen name="products/form" />
+      <Stack.Screen name="products/[id]" />
+      <Stack.Screen name="inventory/adjust" />
+      <Stack.Screen name="inventory/history" />
+      <Stack.Screen name="categories-units" />
     </Stack>
   );
 }

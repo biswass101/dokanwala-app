@@ -1,3 +1,4 @@
+export { ConfirmDialog } from './feedback/ConfirmDialog';
 export { EmptyState } from './feedback/EmptyState';
 export { ErrorState } from './feedback/ErrorState';
 export { LoadingView } from './feedback/LoadingView';

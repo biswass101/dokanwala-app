@@ -1,23 +1,18 @@
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
-import { disconnectDatabase, prisma } from '../../src/database/prisma.js';
+import { disconnectDatabase } from '../../src/database/prisma.js';
+import { cleanTestDatabase } from '../helpers/db-reset.js';
 
 describe('Phase 2 Auth, Security & Shop Setup API', () => {
   const app = createApp();
 
   beforeEach(async () => {
-    await prisma.auditLog.deleteMany();
-    await prisma.refreshSession.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.shop.deleteMany();
+    await cleanTestDatabase();
   });
 
   afterAll(async () => {
-    await prisma.auditLog.deleteMany();
-    await prisma.refreshSession.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.shop.deleteMany();
+    await cleanTestDatabase();
     await disconnectDatabase();
   });
 

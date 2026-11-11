@@ -25,7 +25,13 @@ export function validateRequest(schemas: ValidationSchemas) {
         next(new ValidationError('Invalid query parameters', formatZodIssues(result.error)));
         return;
       }
-      req.query = result.data as Request['query'];
+      // Express 5 defines `req.query` as a prototype getter; shadow with parsed values safely
+      Object.defineProperty(req, 'query', {
+        value: result.data,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
 
     if (schemas.body) {

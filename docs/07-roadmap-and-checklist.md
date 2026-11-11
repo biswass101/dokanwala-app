@@ -35,10 +35,10 @@
 - [x] Tests: Auth, PIN lockout, token rotation, RBAC isolation, mobile auth forms & offline PIN unlock
 
 ### Phase 3 — Product and Inventory Management
-- [ ] Prisma migration for `Category`, `Unit`, `Product`, `ProductUnit`, `InventoryBalance`, `StockMovement`, `StockAdjustment` + Bangladeshi seed defaults (Pan, Supari, Jorda, standard Bangla units)
-- [ ] Backend CRUD + bilingual NFC search (`nameBn`, `nameEn`, barcode), unit conversions, stock alerts, wastage/damage/expiry recording, inventory valuation
-- [ ] Mobile SQLite product/unit/inventory mirror + Product list, Product create/edit with unit conversion builder, Stock adjust & Wastage screens
-- [ ] Tests: Fractional unit conversions, wastage loss calculations, soft archiving, RNTL product/unit forms
+- [x] Prisma migration for `Category`, `Unit`, `Product`, `ProductUnit`, `InventoryBalance`, `StockMovement`, `StockAdjustment` + Bangladeshi seed defaults (Pan, Supari, Jorda, standard Bangla units)
+- [x] Backend CRUD + bilingual NFC search (`nameBn`, `nameEn`, barcode), unit conversions, stock alerts, wastage/damage/expiry recording, inventory valuation
+- [x] Mobile SQLite product/unit/inventory mirror + Product list, Product create/edit with unit conversion builder, Stock adjust & Wastage screens
+- [x] Tests: Fractional unit conversions, wastage loss calculations, soft archiving, RNTL product/unit forms
 
 ### Phase 4 — Sales and POS
 - [ ] Prisma migration for `Sale`, `SaleItem`, `Payment`, `SaleReturn`, `SaleReturnItem`

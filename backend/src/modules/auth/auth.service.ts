@@ -8,6 +8,7 @@ import {
 } from '@dokanwala/shared';
 import { env } from '../../config/env.js';
 import { prisma } from '../../database/prisma.js';
+import { ensureDefaultCatalogForShop } from '../catalog/catalog.seed.js';
 import {
   ConflictError,
   ForbiddenError,
@@ -118,6 +119,8 @@ export async function registerShopAndOwner(
         expiresAt,
       },
     });
+
+    await ensureDefaultCatalogForShop(shop.id, tx);
 
     await tx.auditLog.create({
       data: {

@@ -1,5 +1,6 @@
 import type { AuthSessionResponse, AuthUserDto, ShopProfileDto } from '@dokanwala/shared';
 import { create } from 'zustand';
+import { clearLocalCatalogData } from '@/database/repositories/catalog-local.repo';
 import {
   clearLocalSessionData,
   loadLocalPreferences,
@@ -178,6 +179,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (result.reason === 'WIPED') {
       await clearLocalSessionData();
+      await clearLocalCatalogData();
       set({
         status: 'unauthenticated',
         user: null,
@@ -211,6 +213,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   clearLocalAuthOnly: async () => {
     await clearSecureAuthSession();
     await clearLocalSessionData();
+    await clearLocalCatalogData();
     set({
       status: 'unauthenticated',
       user: null,

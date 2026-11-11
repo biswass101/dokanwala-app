@@ -1,18 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
   addPoisha,
+  addQuantities,
   bdtToPoisha,
+  calculateInventoryValuationPoisha,
   calculateLineCogsPoisha,
   calculateLineTotalPoisha,
   calculateMovingWacBdt,
+  compareQuantities,
   convertFromBaseQuantity,
   convertToBaseQuantity,
   formatBdt,
+  formatQuantityDisplay,
   normalizeBdPhone,
   normalizeNumericInput,
   normalizeUnicodeText,
   poishaToBdtString,
   subtractPoisha,
+  subtractQuantities,
   toBanglaDigits,
   toEnglishDigits,
 } from '../src/index.js';
@@ -89,5 +94,11 @@ describe('Unit conversions', () => {
     expect(convertToBaseQuantity('2.5', '20')).toBe('50.0000');
     expect(convertFromBaseQuantity('50', '20')).toBe('2.5000');
     expect(convertToBaseQuantity('০.২৫', '1000')).toBe('250.0000');
+    expect(addQuantities('0.1', '0.2')).toBe('0.3000');
+    expect(subtractQuantities('500', '125.5')).toBe('374.5000');
+    expect(compareQuantities('120.0000', '120')).toBe(0);
+    expect(formatQuantityDisplay('25.5000')).toBe('25.5');
+    expect(calculateInventoryValuationPoisha('250', '0.855000')).toBe(21375);
+    expect(calculateInventoryValuationPoisha('-5', '10.000000')).toBe(0);
   });
 });
