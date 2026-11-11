@@ -41,10 +41,10 @@
 - [x] Tests: Fractional unit conversions, wastage loss calculations, soft archiving, RNTL product/unit forms
 
 ### Phase 4 — Sales and POS
-- [ ] Prisma migration for `Sale`, `SaleItem`, `Payment`, `SaleReturn`, `SaleReturnItem`
-- [ ] Backend POS transaction engine (server recalculation, split cash/bKash/Nagad payments, credit `বাকি` validation, WAC COGS snapshot, returns & cancellations, idempotency)
-- [ ] Mobile POS screen: fast product search, category chips, frequent items, Zustand cart with unit switching & quick weight/quantity presets, checkout sheet (discounts, split payment, customer `বাকি` selection), Bangla receipt view/share
-- [ ] Tests: Fractional weight sales, discounts, split payments, credit sales, partial/full returns, idempotency replay, insufficient stock rollback
+- [x] Prisma migration for `Sale`, `SaleItem`, `Payment`, `SaleReturn`, `SaleReturnItem` (plus `Customer` table to enforce credit `বাকি` FKs cleanly) (`20261111215339_phase4_sales_pos`)
+- [x] Backend POS transaction engine (server recalculation, split cash/bKash/Nagad payments, credit `বাকি` validation, WAC COGS snapshot, returns & cancellations, idempotency)
+- [x] Mobile POS screen: fast product search, category chips, frequent items, Zustand cart with unit switching & quick weight/quantity presets, checkout sheet (discounts, split payment, customer `বাকি` selection), Bangla receipt view/share
+- [x] Tests: Fractional weight sales, discounts, split payments, credit sales, partial/full returns, idempotency replay, insufficient stock rollback
 
 ### Phase 5 — Purchases and Suppliers
 - [ ] Prisma migration for `Supplier`, `Purchase`, `PurchaseItem`, `PurchaseReturn`, `SupplierPayment`

@@ -8,9 +8,11 @@ import { notFoundHandler } from './middlewares/not-found.js';
 import { attachRequestId, httpRequestLogger } from './middlewares/request-context.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { categoriesRouter } from './modules/categories/categories.routes.js';
+import { customersRouter } from './modules/customers/customers.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { inventoryRouter } from './modules/inventory/inventory.routes.js';
 import { productsRouter } from './modules/products/products.routes.js';
+import { salesRouter } from './modules/sales/sales.routes.js';
 import { shopRouter } from './modules/shop/shop.routes.js';
 import { unitsRouter } from './modules/units/units.routes.js';
 
@@ -73,6 +75,8 @@ export function createApp(): Express {
   v1Router.use('/units', unitsRouter);
   v1Router.use('/products', productsRouter);
   v1Router.use('/inventory', inventoryRouter);
+  v1Router.use('/customers', customersRouter);
+  v1Router.use('/sales', salesRouter);
 
   app.use('/api/v1', v1Router);
 

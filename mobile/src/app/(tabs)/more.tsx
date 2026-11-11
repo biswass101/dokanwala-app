@@ -98,6 +98,13 @@ export default function MoreScreen() {
         ) : null}
 
         <Button
+          label={t('more.salesHistory')}
+          variant="outline"
+          fullWidth
+          onPress={() => router.push('/sales/history')}
+        />
+
+        <Button
           label={t('more.quickPin')}
           variant="secondary"
           fullWidth

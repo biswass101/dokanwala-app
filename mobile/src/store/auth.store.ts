@@ -1,6 +1,7 @@
 import type { AuthSessionResponse, AuthUserDto, ShopProfileDto } from '@dokanwala/shared';
 import { create } from 'zustand';
 import { clearLocalCatalogData } from '@/database/repositories/catalog-local.repo';
+import { clearLocalSalesData } from '@/database/repositories/sales-local.repo';
 import {
   clearLocalSessionData,
   loadLocalPreferences,
@@ -20,6 +21,7 @@ import {
   verifyOfflinePin,
   type OfflinePinVerifyResult,
 } from '@/services/auth/secure-session';
+import { useCartStore } from '@/store/cart.store';
 import { usePreferencesStore } from '@/store/preferences.store';
 
 export type AuthStatus = 'booting' | 'unauthenticated' | 'locked' | 'authenticated';
@@ -180,6 +182,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (result.reason === 'WIPED') {
       await clearLocalSessionData();
       await clearLocalCatalogData();
+      await clearLocalSalesData();
+      useCartStore.getState().clearCart();
       set({
         status: 'unauthenticated',
         user: null,
@@ -214,6 +218,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await clearSecureAuthSession();
     await clearLocalSessionData();
     await clearLocalCatalogData();
+    await clearLocalSalesData();
+    useCartStore.getState().clearCart();
     set({
       status: 'unauthenticated',
       user: null,

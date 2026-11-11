@@ -1,5 +1,6 @@
 import { MIGRATION_001_AUTH_SHOP } from './migrations/001_initial_auth_shop';
 import { MIGRATION_002_PRODUCTS_INVENTORY } from './migrations/002_products_inventory';
+import { MIGRATION_003_SALES_POS } from './migrations/003_sales_pos';
 import { openPlatformSqliteDatabase } from './sqlite-driver';
 import type { SqliteDatabaseAdapter } from './sqlite.types';
 
@@ -21,6 +22,11 @@ const MIGRATIONS: readonly MigrationDefinition[] = [
     version: 2,
     name: '002_products_inventory',
     sql: MIGRATION_002_PRODUCTS_INVENTORY,
+  },
+  {
+    version: 3,
+    name: '003_sales_pos',
+    sql: MIGRATION_003_SALES_POS,
   },
 ];
 

@@ -3,14 +3,19 @@ import {
   addPoisha,
   addQuantities,
   bdtToPoisha,
+  calculateDiscountPoisha,
   calculateInventoryValuationPoisha,
   calculateLineCogsPoisha,
   calculateLineTotalPoisha,
   calculateMovingWacBdt,
+  calculateProportionalReturnDiscount,
   compareQuantities,
   convertFromBaseQuantity,
   convertToBaseQuantity,
+  doesDiscountExceedPercentCap,
   formatBdt,
+  formatDhakaDate,
+  formatDhakaDateTime,
   formatQuantityDisplay,
   normalizeBdPhone,
   normalizeNumericInput,
@@ -100,5 +105,44 @@ describe('Unit conversions', () => {
     expect(formatQuantityDisplay('25.5000')).toBe('25.5');
     expect(calculateInventoryValuationPoisha('250', '0.855000')).toBe(21375);
     expect(calculateInventoryValuationPoisha('-5', '10.000000')).toBe(0);
+  });
+});
+
+describe('POS discount & Dhaka date helpers', () => {
+  it('computes fixed and percentage discounts in poisha accurately', () => {
+    expect(calculateDiscountPoisha(50000, 'FIXED_POISHA', 2500)).toBe(2500);
+    expect(calculateDiscountPoisha(50000, 'PERCENT', '১০')).toBe(5000);
+    expect(calculateDiscountPoisha(3333, 'PERCENT', 10)).toBe(333);
+
+    // Proportional return discount guarantees cumulative discount settles cleanly
+    const firstPartDiscount = calculateProportionalReturnDiscount({
+      returnSubtotalPoisha: 10000,
+      saleSubtotalPoisha: 30000,
+      totalDiscountPoisha: 1000,
+      alreadyDiscountAdjustedPoisha: 0,
+      isFullRemainingReturn: false,
+    });
+    expect(firstPartDiscount).toBe(333);
+
+    const finalPartDiscount = calculateProportionalReturnDiscount({
+      returnSubtotalPoisha: 20000,
+      saleSubtotalPoisha: 30000,
+      totalDiscountPoisha: 1000,
+      alreadyDiscountAdjustedPoisha: firstPartDiscount,
+      isFullRemainingReturn: true,
+    });
+    expect(firstPartDiscount + finalPartDiscount).toBe(1000);
+
+    expect(doesDiscountExceedPercentCap(10000, 1000, 10)).toBe(false);
+    expect(doesDiscountExceedPercentCap(10000, 1001, 10)).toBe(true);
+    expect(doesDiscountExceedPercentCap(0, 0, 10)).toBe(false);
+  });
+
+  it('formats UTC instants cleanly in Asia/Dhaka with Bangla and English styles', () => {
+    // 2026-11-12T09:30:00.000Z => 2026-11-12 15:30 BST (বিকাল ৩:৩০)
+    const iso = '2026-11-12T09:30:00.000Z';
+    expect(formatDhakaDate(iso, 'bn', 'bn')).toBe('১২ নভেম্বর ২০২৬');
+    expect(formatDhakaDateTime(iso, 'bn', 'bn')).toBe('১২ নভেম্বর ২০২৬, বিকাল ৩:৩০');
+    expect(formatDhakaDateTime(iso, 'en', 'en')).toBe('12 Nov 2026, 3:30 PM');
   });
 });

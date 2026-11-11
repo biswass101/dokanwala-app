@@ -9,6 +9,12 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
   const products = new Map<string, Record<string, unknown>>();
   const productUnits = new Map<string, Record<string, unknown>>();
   const inventoryBalances = new Map<string, Record<string, unknown>>();
+  const customers = new Map<string, Record<string, unknown>>();
+  const sales = new Map<string, Record<string, unknown>>();
+  const saleItems = new Map<string, Record<string, unknown>>();
+  const payments = new Map<string, Record<string, unknown>>();
+  const saleReturns = new Map<string, Record<string, unknown>>();
+  const saleReturnItems = new Map<string, Record<string, unknown>>();
 
   return {
     async execAsync() {
@@ -130,6 +136,113 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           version: params[5],
           updated_at: params[6],
         });
+      } else if (normalized.includes('INTO CUSTOMERS_LOCAL')) {
+        customers.set(String(params[0] ?? ''), {
+          id: params[0],
+          shop_id: params[1],
+          name_bn: params[2],
+          name_en: params[3],
+          phone: params[4],
+          address: params[5],
+          note: params[6],
+          total_purchased_poisha: params[7],
+          total_paid_poisha: params[8],
+          due_poisha: params[9],
+          is_active: params[10],
+          version: params[11],
+          created_at: params[12],
+          updated_at: params[13],
+        });
+      } else if (normalized.includes('INTO SALES_LOCAL')) {
+        sales.set(String(params[0] ?? ''), {
+          id: params[0],
+          shop_id: params[1],
+          receipt_number: params[2],
+          customer_id: params[3],
+          customer_name_snapshot: params[4],
+          status: params[5],
+          subtotal_poisha: params[6],
+          discount_type: params[7],
+          discount_value: params[8],
+          discount_poisha: params[9],
+          total_poisha: params[10],
+          paid_poisha: params[11],
+          due_poisha: params[12],
+          tendered_poisha: params[13],
+          change_poisha: params[14],
+          returned_total_poisha: params[15],
+          cash_refunded_poisha: params[16],
+          cogs_poisha: params[17],
+          estimated_profit_poisha: params[18],
+          note: params[19],
+          actor_user_id: params[20],
+          actor_name: params[21],
+          cancelled_at: params[22],
+          cancel_reason: params[23],
+          sold_at: params[24],
+          created_at: params[25],
+          updated_at: params[26],
+        });
+      } else if (normalized.includes('INTO SALE_ITEMS_LOCAL')) {
+        saleItems.set(String(params[0] ?? ''), {
+          id: params[0],
+          sale_id: params[1],
+          product_id: params[2],
+          unit_id: params[3],
+          product_name_bn: params[4],
+          product_name_en: params[5],
+          unit_name_bn: params[6],
+          unit_name_en: params[7],
+          qty_display: params[8],
+          conversion_factor_to_base: params[9],
+          qty_base: params[10],
+          returned_qty_base: params[11],
+          unit_selling_price_poisha: params[12],
+          unit_cost_at_sale_bdt: params[13],
+          line_subtotal_poisha: params[14],
+          line_cogs_poisha: params[15],
+        });
+      } else if (normalized.includes('INTO PAYMENTS_LOCAL')) {
+        payments.set(String(params[0] ?? ''), {
+          id: params[0],
+          sale_id: params[1],
+          method: params[2],
+          amount_poisha: params[3],
+          reference: params[4],
+          received_at: params[5],
+        });
+      } else if (normalized.includes('INTO SALE_RETURNS_LOCAL')) {
+        saleReturns.set(String(params[0] ?? ''), {
+          id: params[0],
+          sale_id: params[1],
+          return_number: params[2],
+          refund_method: params[3],
+          subtotal_poisha: params[4],
+          discount_adjustment_poisha: params[5],
+          refund_total_poisha: params[6],
+          cash_refund_poisha: params[7],
+          credit_adjusted_poisha: params[8],
+          reason: params[9],
+          actor_user_id: params[10],
+          actor_name: params[11],
+          returned_at: params[12],
+        });
+      } else if (normalized.includes('INTO SALE_RETURN_ITEMS_LOCAL')) {
+        saleReturnItems.set(String(params[0] ?? ''), {
+          id: params[0],
+          sale_return_id: params[1],
+          sale_item_id: params[2],
+          product_id: params[3],
+          product_name_bn: params[4],
+          product_name_en: params[5],
+          unit_name_bn: params[6],
+          unit_name_en: params[7],
+          qty_display: params[8],
+          qty_base: params[9],
+          unit_selling_price_poisha: params[10],
+          line_refund_poisha: params[11],
+          restored_cogs_poisha: params[12],
+        });
       } else if (normalized.startsWith('DELETE FROM SHOPS_LOCAL')) {
         shops.clear();
       } else if (normalized.startsWith('DELETE FROM USERS_LOCAL')) {
@@ -161,6 +274,57 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
         } else {
           products.clear();
         }
+      } else if (normalized.startsWith('DELETE FROM CUSTOMERS_LOCAL')) {
+        customers.clear();
+      } else if (normalized.startsWith('DELETE FROM SALE_RETURN_ITEMS_LOCAL')) {
+        if (normalized.includes('WHERE SALE_RETURN_ID IN')) {
+          const targetSaleId = String(params[0] ?? '');
+          const returnIds = new Set(
+            Array.from(saleReturns.values())
+              .filter((r) => r.sale_id === targetSaleId)
+              .map((r) => String(r.id ?? '')),
+          );
+          for (const [key, row] of saleReturnItems.entries()) {
+            if (returnIds.has(String(row.sale_return_id ?? ''))) {
+              saleReturnItems.delete(key);
+            }
+          }
+        } else {
+          saleReturnItems.clear();
+        }
+      } else if (normalized.startsWith('DELETE FROM SALE_RETURNS_LOCAL')) {
+        if (normalized.includes('WHERE SALE_ID = ?')) {
+          const targetSaleId = String(params[0] ?? '');
+          for (const [key, row] of saleReturns.entries()) {
+            if (row.sale_id === targetSaleId) saleReturns.delete(key);
+          }
+        } else {
+          saleReturns.clear();
+        }
+      } else if (normalized.startsWith('DELETE FROM PAYMENTS_LOCAL')) {
+        if (normalized.includes('WHERE SALE_ID = ?')) {
+          const targetSaleId = String(params[0] ?? '');
+          for (const [key, row] of payments.entries()) {
+            if (row.sale_id === targetSaleId) payments.delete(key);
+          }
+        } else {
+          payments.clear();
+        }
+      } else if (normalized.startsWith('DELETE FROM SALE_ITEMS_LOCAL')) {
+        if (normalized.includes('WHERE SALE_ID = ?')) {
+          const targetSaleId = String(params[0] ?? '');
+          for (const [key, row] of saleItems.entries()) {
+            if (row.sale_id === targetSaleId) saleItems.delete(key);
+          }
+        } else {
+          saleItems.clear();
+        }
+      } else if (normalized.startsWith('DELETE FROM SALES_LOCAL')) {
+        if (normalized.includes('WHERE ID = ?')) {
+          sales.delete(String(params[0] ?? ''));
+        } else {
+          sales.clear();
+        }
       }
       return { changes: 1, lastInsertRowId: 1 };
     },
@@ -189,6 +353,12 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           return (inventoryBalances.get(String(params[0] ?? '')) as T | undefined) ?? null;
         }
         return (inventoryBalances.values().next().value as T | undefined) ?? null;
+      }
+      if (normalized.includes('FROM SALES_LOCAL')) {
+        if (normalized.includes('WHERE ID = ?')) {
+          return (sales.get(String(params[0] ?? '')) as T | undefined) ?? null;
+        }
+        return (sales.values().next().value as T | undefined) ?? null;
       }
       return null;
     },
@@ -226,6 +396,46 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
         return Array.from(inventoryBalances.values()).filter(
           (row) => !shopFilter || row.shop_id === shopFilter,
         ) as T[];
+      }
+      if (normalized.includes('FROM CUSTOMERS_LOCAL')) {
+        const shopFilter = normalized.includes('WHERE SHOP_ID = ?') ? String(params[0] ?? '') : null;
+        return Array.from(customers.values()).filter(
+          (row) => !shopFilter || row.shop_id === shopFilter,
+        ) as T[];
+      }
+      if (normalized.includes('FROM SALES_LOCAL')) {
+        const shopFilter = normalized.includes('WHERE SHOP_ID = ?') ? String(params[0] ?? '') : null;
+        return Array.from(sales.values()).filter(
+          (row) => !shopFilter || row.shop_id === shopFilter,
+        ) as T[];
+      }
+      if (normalized.includes('FROM SALE_ITEMS_LOCAL')) {
+        if (normalized.includes('WHERE SALE_ID = ?')) {
+          const targetSaleId = String(params[0] ?? '');
+          return Array.from(saleItems.values()).filter((r) => r.sale_id === targetSaleId) as T[];
+        }
+        return Array.from(saleItems.values()) as T[];
+      }
+      if (normalized.includes('FROM PAYMENTS_LOCAL')) {
+        if (normalized.includes('WHERE SALE_ID = ?')) {
+          const targetSaleId = String(params[0] ?? '');
+          return Array.from(payments.values()).filter((r) => r.sale_id === targetSaleId) as T[];
+        }
+        return Array.from(payments.values()) as T[];
+      }
+      if (normalized.includes('FROM SALE_RETURNS_LOCAL')) {
+        if (normalized.includes('WHERE SALE_ID = ?')) {
+          const targetSaleId = String(params[0] ?? '');
+          return Array.from(saleReturns.values()).filter((r) => r.sale_id === targetSaleId) as T[];
+        }
+        return Array.from(saleReturns.values()) as T[];
+      }
+      if (normalized.includes('FROM SALE_RETURN_ITEMS_LOCAL')) {
+        if (normalized.includes('WHERE SALE_RETURN_ID = ?')) {
+          const retId = String(params[0] ?? '');
+          return Array.from(saleReturnItems.values()).filter((r) => r.sale_return_id === retId) as T[];
+        }
+        return Array.from(saleReturnItems.values()) as T[];
       }
       return [] as T[];
     },

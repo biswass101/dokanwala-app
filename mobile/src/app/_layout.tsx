@@ -85,6 +85,9 @@ function AuthNavigationGate() {
       <Stack.Screen name="inventory/adjust" />
       <Stack.Screen name="inventory/history" />
       <Stack.Screen name="categories-units" />
+      <Stack.Screen name="sales/history" />
+      <Stack.Screen name="sales/[id]" />
+      <Stack.Screen name="sales/receipt" />
     </Stack>
   );
 }
