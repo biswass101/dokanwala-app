@@ -26,13 +26,13 @@
 - [x] Pass quality gates: `typecheck`, `lint`, unit tests, Supertest `/health`, RNTL component tests
 
 ### Phase 2 — Authentication and Shop Setup
-- [ ] Prisma schema & initial migration for `Shop`, `User`, `RefreshSession`, `AuditLog`
-- [ ] Argon2id password + PIN hashing, JWT access + hashed rotating refresh tokens
-- [ ] Auth routes (`/register`, `/login`, `/pin-login`, `/refresh`, `/logout`, `/pin`, `/me`) + `OWNER`/`EMPLOYEE` RBAC + `shopScope` middleware
-- [ ] Shop settings & staff endpoints (`/shop`, `/shop/users`)
-- [ ] Mobile `expo-secure-store` token & offline PIN verifier storage, Login / PIN Unlock / Shop Setup screens (Bangla + English)
-- [ ] Local Expo SQLite database bootstrap & migration runner (`app_preferences`, schema version table)
-- [ ] Tests: Auth, PIN lockout, token rotation, RBAC isolation, mobile auth forms & offline PIN unlock
+- [x] Prisma schema & initial migration for `Shop`, `User`, `RefreshSession`, `AuditLog` (`20261111203645_phase2_auth_shop`)
+- [x] Argon2id password + PIN hashing, JWT access + hashed rotating refresh tokens with reuse-theft revocation
+- [x] Auth routes (`/register`, `/login`, `/pin-login`, `/refresh`, `/logout`, `/pin`, `/me`) + `OWNER`/`EMPLOYEE` RBAC + `requireAuth`/`requireRole` middleware
+- [x] Shop settings & staff endpoints (`/shop`, `/shop/users`)
+- [x] Mobile `expo-secure-store` token & offline PIN verifier storage, Login / PIN Unlock / Setup PIN / Shop Settings / Staff Management screens (Bangla + English)
+- [x] Local Expo SQLite database bootstrap & migration runner (`001_initial_auth_shop`: `schema_migrations`, `app_preferences`, `shops_local`, `users_local`)
+- [x] Tests: Auth, PIN lockout, token rotation, RBAC isolation, mobile auth forms & offline PIN unlock
 
 ### Phase 3 — Product and Inventory Management
 - [ ] Prisma migration for `Category`, `Unit`, `Product`, `ProductUnit`, `InventoryBalance`, `StockMovement`, `StockAdjustment` + Bangladeshi seed defaults (Pan, Supari, Jorda, standard Bangla units)

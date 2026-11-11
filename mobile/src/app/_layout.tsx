@@ -14,11 +14,13 @@ import {
 } from '@expo-google-fonts/noto-sans-bengali';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { LoadingView } from '@/components';
+import { useAuthStore } from '@/store/auth.store';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -30,6 +32,57 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function AuthNavigationGate() {
+  const status = useAuthStore((state) => state.status);
+  const bootstrapSession = useAuthStore((state) => state.bootstrapSession);
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    void bootstrapSession();
+  }, [bootstrapSession]);
+
+  useEffect(() => {
+    if (status === 'booting') return;
+
+    const segmentList: readonly string[] = segments;
+    const firstSegment = segmentList[0];
+    const inAuthGroup = firstSegment === '(auth)';
+    const secondSegment = segmentList[1];
+
+    if (status === 'unauthenticated') {
+      if (!inAuthGroup || secondSegment !== 'login') {
+        router.replace('/(auth)/login');
+      }
+      return;
+    }
+
+    if (status === 'locked') {
+      if (!inAuthGroup || secondSegment !== 'pin-unlock') {
+        router.replace('/(auth)/pin-unlock');
+      }
+      return;
+    }
+
+    if (status === 'authenticated' && inAuthGroup && secondSegment !== 'setup-pin') {
+      router.replace('/(tabs)');
+    }
+  }, [status, segments, router]);
+
+  if (status === 'booting') {
+    return <LoadingView />;
+  }
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="shop-settings" />
+      <Stack.Screen name="staff" />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -57,9 +110,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-        </Stack>
+        <AuthNavigationGate />
       </QueryClientProvider>
     </SafeAreaProvider>
   );

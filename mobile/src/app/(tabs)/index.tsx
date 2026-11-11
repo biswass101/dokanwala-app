@@ -15,12 +15,16 @@ import {
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { useFormattedMoney } from '@/hooks/useFormattedMoney';
 import { fetchHealthStatus } from '@/services/api/health';
+import { useAuthStore } from '@/store/auth.store';
 import { Colors, Layout } from '@/theme/tokens';
 
 export default function HomeScreen() {
   const { t, toggleLanguage } = useAppTranslation();
   const { formatMoney } = useFormattedMoney();
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const shop = useAuthStore((state) => state.shop);
+
   const [sampleAmountRaw, setSampleAmountRaw] = useState('১২৫০.৫০');
   const [sampleAmountAscii, setSampleAmountAscii] = useState('1250.50');
 
@@ -54,10 +58,12 @@ export default function HomeScreen() {
       >
         <View style={{ flex: 1 }}>
           <AppText variant="screenTitle" weight="bold">
-            {t('app.name')}
+            {shop?.nameBn ?? t('app.name')}
           </AppText>
           <AppText variant="caption" color={Colors.textSecondary}>
-            {t('app.subtitle')}
+            {user
+              ? `${t('home.greeting', { name: user.name })} • ${t(`roles.${user.role}`)}`
+              : t('app.subtitle')}
           </AppText>
         </View>
 

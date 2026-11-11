@@ -6,7 +6,9 @@ import { env } from './config/env.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFoundHandler } from './middlewares/not-found.js';
 import { attachRequestId, httpRequestLogger } from './middlewares/request-context.js';
+import { authRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import { shopRouter } from './modules/shop/shop.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -61,6 +63,8 @@ export function createApp(): Express {
 
   const v1Router = express.Router();
   v1Router.use('/health', healthRouter);
+  v1Router.use('/auth', authRouter);
+  v1Router.use('/shop', shopRouter);
 
   app.use('/api/v1', v1Router);
 

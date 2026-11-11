@@ -9,3 +9,4 @@ export { Button } from './ui/Button';
 export { Card } from './ui/Card';
 export { Input } from './ui/Input';
 export { NumericInput } from './ui/NumericInput';
+export { PinKeypad } from './ui/PinKeypad';
