@@ -9,6 +9,10 @@ import { attachRequestId, httpRequestLogger } from './middlewares/request-contex
 import { authRouter } from './modules/auth/auth.routes.js';
 import { categoriesRouter } from './modules/categories/categories.routes.js';
 import { customersRouter } from './modules/customers/customers.routes.js';
+import {
+  expenseCategoriesRouter,
+  expensesRouter,
+} from './modules/expenses/expenses.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { inventoryRouter } from './modules/inventory/inventory.routes.js';
 import { productsRouter } from './modules/products/products.routes.js';
@@ -81,6 +85,8 @@ export function createApp(): Express {
   v1Router.use('/sales', salesRouter);
   v1Router.use('/suppliers', suppliersRouter);
   v1Router.use('/purchases', purchasesRouter);
+  v1Router.use('/expense-categories', expenseCategoriesRouter);
+  v1Router.use('/expenses', expensesRouter);
 
   app.use('/api/v1', v1Router);
 

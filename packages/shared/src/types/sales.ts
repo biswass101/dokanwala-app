@@ -126,6 +126,7 @@ export interface SaleDto {
   discountPoisha: number;
   totalPoisha: number;
   paidPoisha: number;
+  settledDuePoisha: number;
   duePoisha: number;
   tenderedPoisha: number | null;
   changePoisha: number;

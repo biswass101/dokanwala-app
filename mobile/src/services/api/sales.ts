@@ -1,5 +1,7 @@
 import type {
   CustomerDto,
+  CustomerLedgerEntryDto,
+  CustomerPaymentDto,
   DiscountType,
   PaymentMethod,
   RefundMethod,
@@ -8,7 +10,7 @@ import type {
   SaleStatus,
 } from '@dokanwala/shared';
 import * as Crypto from 'expo-crypto';
-import { unwrapApiGet, unwrapApiPost } from './client';
+import { unwrapApiGet, unwrapApiPatch, unwrapApiPost } from './client';
 
 export interface CreateCustomerPayload {
   id?: string;
@@ -17,6 +19,27 @@ export interface CreateCustomerPayload {
   phone?: string | null;
   address?: string | null;
   note?: string | null;
+}
+
+export interface UpdateCustomerPayload {
+  nameBn?: string;
+  nameEn?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  note?: string | null;
+  isActive?: boolean;
+  confirmWithDue?: boolean;
+  expectedVersion?: number;
+}
+
+export interface CreateCustomerPaymentPayload {
+  id?: string;
+  saleId?: string | null;
+  method: PaymentMethod;
+  amountPoisha: number;
+  reference?: string | null;
+  note?: string | null;
+  paidAt?: string;
 }
 
 export interface CreateSalePayload {
@@ -68,8 +91,42 @@ export const customersApi = {
     return unwrapApiGet('/customers', query);
   },
 
+  get(id: string): Promise<{ customer: CustomerDto }> {
+    return unwrapApiGet(`/customers/${id}`);
+  },
+
   create(body: CreateCustomerPayload): Promise<{ customer: CustomerDto }> {
     return unwrapApiPost('/customers', body);
+  },
+
+  update(id: string, body: UpdateCustomerPayload): Promise<{ customer: CustomerDto }> {
+    return unwrapApiPatch(`/customers/${id}`, body);
+  },
+
+  getLedger(
+    id: string,
+    params?: { from?: string; to?: string; limit?: number },
+  ): Promise<{ customer: CustomerDto; entries: CustomerLedgerEntryDto[] }> {
+    const query: Record<string, string | number> = {};
+    if (params?.from) query.from = params.from;
+    if (params?.to) query.to = params.to;
+    if (params?.limit) query.limit = params.limit;
+    return unwrapApiGet(`/customers/${id}/ledger`, query);
+  },
+
+  collectPayment(
+    id: string,
+    body: CreateCustomerPaymentPayload,
+    idempotencyKey?: string,
+  ): Promise<{
+    payment: CustomerPaymentDto;
+    customer: CustomerDto;
+    idempotencyReplayed: boolean;
+  }> {
+    const key = idempotencyKey ?? Crypto.randomUUID();
+    return unwrapApiPost(`/customers/${id}/payments`, body, {
+      'X-Idempotency-Key': key,
+    });
   },
 };
 

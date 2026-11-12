@@ -82,6 +82,11 @@ enum PurchaseRefundMethod {
   PAYABLE_ADJUSTMENT
 }
 
+enum ExpenseAuditAction {
+  CREATED
+  UPDATED
+}
+
 model SystemMetadata {
   key       String   @id @db.VarChar(100)
   value     String   @db.Text
@@ -133,6 +138,10 @@ model Shop {
   purchaseReturns     PurchaseReturn[]
   purchaseReturnItems PurchaseReturnItem[]
   supplierPayments    SupplierPayment[]
+  customerPayments    CustomerPayment[]
+  expenseCategories   ExpenseCategory[]
+  expenses            Expense[]
+  expenseAuditLogs    ExpenseAuditLog[]
 
   @@map("shops")
 }
@@ -165,6 +174,9 @@ model User {
   purchasesRecorded       Purchase[]        @relation("PurchaseActorUser")
   purchaseReturnsRecorded PurchaseReturn[]
   supplierPayments        SupplierPayment[]
+  customerPayments        CustomerPayment[]
+  expensesRecorded        Expense[]
+  expenseAuditLogs        ExpenseAuditLog[]
 
   @@index([shopId, isActive])
   @@map("users")
@@ -395,8 +407,9 @@ model Customer {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  shop  Shop   @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  sales Sale[]
+  shop     Shop              @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  sales    Sale[]
+  payments CustomerPayment[]
 
   @@index([shopId, isActive, deletedAt])
   @@index([shopId, duePoisha])
@@ -417,6 +430,7 @@ model Sale {
   discountPoisha       Int          @default(0) @map("discount_poisha")
   totalPoisha          Int          @map("total_poisha")
   paidPoisha           Int          @default(0) @map("paid_poisha")
+  settledDuePoisha     Int          @default(0) @map("settled_due_poisha")
   duePoisha            Int          @default(0) @map("due_poisha")
   tenderedPoisha       Int?         @map("tendered_poisha")
   changePoisha         Int          @default(0) @map("change_poisha")
@@ -438,9 +452,10 @@ model Sale {
   customer        Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
   actorUser       User?        @relation("SaleActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
   cancelledByUser User?        @relation("SaleCancelledByUser", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
-  items           SaleItem[]
-  payments        Payment[]
-  returns         SaleReturn[]
+  items            SaleItem[]
+  payments         Payment[]
+  returns          SaleReturn[]
+  customerPayments CustomerPayment[]
 
   @@unique([shopId, receiptNumber])
   @@unique([shopId, idempotencyKey])
@@ -715,4 +730,94 @@ model SupplierPayment {
   @@index([shopId, supplierId, paidAt(sort: Desc)])
   @@index([shopId, paidAt(sort: Desc), method])
   @@map("supplier_payments")
+}
+
+model CustomerPayment {
+  id             String        @id @default(uuid()) @db.Uuid
+  shopId         String        @map("shop_id") @db.Uuid
+  customerId     String        @map("customer_id") @db.Uuid
+  saleId         String?       @map("sale_id") @db.Uuid
+  method         PaymentMethod
+  amountPoisha   Int           @map("amount_poisha")
+  reference      String?       @db.VarChar(120)
+  note           String?       @db.VarChar(300)
+  idempotencyKey String?       @map("idempotency_key") @db.VarChar(120)
+  actorUserId    String?       @map("actor_user_id") @db.Uuid
+  paidAt         DateTime      @default(now()) @map("paid_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  sale      Sale?    @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  actorUser User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, customerId, paidAt(sort: Desc)])
+  @@index([shopId, paidAt(sort: Desc), method])
+  @@map("customer_payments")
+}
+
+model ExpenseCategory {
+  id        String    @id @default(uuid()) @db.Uuid
+  shopId    String    @map("shop_id") @db.Uuid
+  nameBn    String    @map("name_bn") @db.VarChar(120)
+  nameEn    String?   @map("name_en") @db.VarChar(120)
+  isDefault Boolean   @default(false) @map("is_default")
+  sortOrder Int       @default(100) @map("sort_order")
+  isActive  Boolean   @default(true) @map("is_active")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  shop     Shop      @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  expenses Expense[]
+
+  @@index([shopId, isActive, deletedAt, sortOrder])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id                   String        @id @default(uuid()) @db.Uuid
+  shopId               String        @map("shop_id") @db.Uuid
+  categoryId           String        @map("category_id") @db.Uuid
+  categoryNameSnapshot String        @map("category_name_snapshot") @db.VarChar(120)
+  amountPoisha         Int           @map("amount_poisha")
+  method               PaymentMethod
+  reference            String?       @db.VarChar(120)
+  note                 String?       @db.VarChar(300)
+  incurredAt           DateTime      @default(now()) @map("incurred_at")
+  idempotencyKey       String?       @map("idempotency_key") @db.VarChar(120)
+  actorUserId          String?       @map("actor_user_id") @db.Uuid
+  version              Int           @default(1)
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  shop      Shop              @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  category  ExpenseCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  actorUser User?             @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  auditLogs ExpenseAuditLog[]
+
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, incurredAt(sort: Desc), categoryId])
+  @@map("expenses")
+}
+
+model ExpenseAuditLog {
+  id         String             @id @default(uuid()) @db.Uuid
+  shopId     String             @map("shop_id") @db.Uuid
+  expenseId  String             @map("expense_id") @db.Uuid
+  action     ExpenseAuditAction
+  editedById String?            @map("edited_by_id") @db.Uuid
+  beforeJson Json?              @map("before_json")
+  afterJson  Json               @map("after_json")
+  reason     String?            @db.VarChar(300)
+  occurredAt DateTime           @default(now()) @map("occurred_at")
+
+  shop     Shop    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  expense  Expense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  editedBy User?   @relation(fields: [editedById], references: [id], onDelete: SetNull)
+
+  @@index([shopId, expenseId, occurredAt(sort: Desc)])
+  @@map("expense_audit_logs")
 }

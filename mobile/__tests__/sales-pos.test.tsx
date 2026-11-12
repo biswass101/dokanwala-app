@@ -260,6 +260,7 @@ const sampleSale: SaleDto = {
   discountPoisha: 250,
   totalPoisha: 18000,
   paidPoisha: 13000,
+  settledDuePoisha: 0,
   duePoisha: 5000,
   tenderedPoisha: 10000,
   changePoisha: 2000,

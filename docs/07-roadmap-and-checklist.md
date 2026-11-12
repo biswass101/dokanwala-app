@@ -60,10 +60,10 @@
 
 ### Phase 6 — Customers and Expenses
 
-- [ ] Prisma migration for `Customer`, `CustomerPayment`, `ExpenseCategory`, `Expense`, `ExpenseAuditLog`
-- [ ] Backend Customer CRUD, Customer Ledger, Due Collection (`CustomerPayment` reducing receivable without creating duplicate revenue), Expense categories, Expenses with `ExpenseAuditLog`
-- [ ] Mobile Customers (`বাকি খাতা`), Collect Due flow, Expense list with category/date filters, Add/Edit Expense + audit history viewer
-- [ ] Tests: Credit sale -> due collection accounting invariant, expense edit audit trail, filter queries
+- [x] Prisma migration for `Customer`, `CustomerPayment`, `ExpenseCategory`, `Expense`, `ExpenseAuditLog` (`20261112164002_phase6_customers_expenses`)
+- [x] Backend Customer CRUD, Customer Ledger, Due Collection (`CustomerPayment` reducing receivable without creating duplicate revenue), Expense categories, Expenses with `ExpenseAuditLog`
+- [x] Mobile Customers (`বাকি খাতা`), Collect Due flow, Expense list with category/date filters, Add/Edit Expense + audit history viewer
+- [x] Tests: Credit sale -> due collection accounting invariant, expense edit audit trail, filter queries
 
 ### Phase 7 — Cashbook and Financial Reporting
 

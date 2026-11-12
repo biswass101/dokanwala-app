@@ -21,6 +21,10 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
   const purchaseReturns = new Map<string, Record<string, unknown>>();
   const purchaseReturnItems = new Map<string, Record<string, unknown>>();
   const supplierLedgerEntries = new Map<string, Record<string, unknown>>();
+  const customerLedgerEntries = new Map<string, Record<string, unknown>>();
+  const expenseCategories = new Map<string, Record<string, unknown>>();
+  const expenses = new Map<string, Record<string, unknown>>();
+  const expenseAuditLogs = new Map<string, Record<string, unknown>>();
 
   return {
     async execAsync() {
@@ -173,21 +177,22 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           discount_poisha: params[9],
           total_poisha: params[10],
           paid_poisha: params[11],
-          due_poisha: params[12],
-          tendered_poisha: params[13],
-          change_poisha: params[14],
-          returned_total_poisha: params[15],
-          cash_refunded_poisha: params[16],
-          cogs_poisha: params[17],
-          estimated_profit_poisha: params[18],
-          note: params[19],
-          actor_user_id: params[20],
-          actor_name: params[21],
-          cancelled_at: params[22],
-          cancel_reason: params[23],
-          sold_at: params[24],
-          created_at: params[25],
-          updated_at: params[26],
+          settled_due_poisha: params[12],
+          due_poisha: params[13],
+          tendered_poisha: params[14],
+          change_poisha: params[15],
+          returned_total_poisha: params[16],
+          cash_refunded_poisha: params[17],
+          cogs_poisha: params[18],
+          estimated_profit_poisha: params[19],
+          note: params[20],
+          actor_user_id: params[21],
+          actor_name: params[22],
+          cancelled_at: params[23],
+          cancel_reason: params[24],
+          sold_at: params[25],
+          created_at: params[26],
+          updated_at: params[27],
         });
       } else if (normalized.includes('INTO SALE_ITEMS_LOCAL')) {
         saleItems.set(String(params[0] ?? ''), {
@@ -357,6 +362,65 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           method: params[10],
           note: params[11],
         });
+      } else if (normalized.includes('INTO CUSTOMER_LEDGER_ENTRIES_LOCAL')) {
+        customerLedgerEntries.set(String(params[0] ?? ''), {
+          id: params[0],
+          customer_id: params[1],
+          type: params[2],
+          reference_id: params[3],
+          reference_number: params[4],
+          occurred_at: params[5],
+          total_poisha: params[6],
+          paid_or_refunded_poisha: params[7],
+          due_delta_poisha: params[8],
+          running_due_poisha: params[9],
+          method: params[10],
+          note: params[11],
+        });
+      } else if (normalized.includes('INTO EXPENSE_CATEGORIES_LOCAL')) {
+        expenseCategories.set(String(params[0] ?? ''), {
+          id: params[0],
+          shop_id: params[1],
+          name_bn: params[2],
+          name_en: params[3],
+          is_default: params[4],
+          sort_order: params[5],
+          is_active: params[6],
+          version: params[7],
+          created_at: params[8],
+          updated_at: params[9],
+        });
+      } else if (normalized.includes('INTO EXPENSES_LOCAL')) {
+        expenses.set(String(params[0] ?? ''), {
+          id: params[0],
+          shop_id: params[1],
+          category_id: params[2],
+          category_name_bn: params[3],
+          category_name_en: params[4],
+          amount_poisha: params[5],
+          method: params[6],
+          reference: params[7],
+          note: params[8],
+          incurred_at: params[9],
+          actor_user_id: params[10],
+          actor_name: params[11],
+          version: params[12],
+          created_at: params[13],
+          updated_at: params[14],
+        });
+      } else if (normalized.includes('INTO EXPENSE_AUDIT_LOGS_LOCAL')) {
+        expenseAuditLogs.set(String(params[0] ?? ''), {
+          id: params[0],
+          shop_id: params[1],
+          expense_id: params[2],
+          action: params[3],
+          edited_by_id: params[4],
+          edited_by_name: params[5],
+          before_json: params[6],
+          after_json: params[7],
+          reason: params[8],
+          occurred_at: params[9],
+        });
       } else if (normalized.startsWith('DELETE FROM SHOPS_LOCAL')) {
         shops.clear();
       } else if (normalized.startsWith('DELETE FROM USERS_LOCAL')) {
@@ -490,6 +554,32 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
         } else {
           supplierLedgerEntries.clear();
         }
+      } else if (normalized.startsWith('DELETE FROM CUSTOMER_LEDGER_ENTRIES_LOCAL')) {
+        if (normalized.includes('WHERE CUSTOMER_ID = ?')) {
+          const targetCustId = String(params[0] ?? '');
+          for (const [key, row] of customerLedgerEntries.entries()) {
+            if (row.customer_id === targetCustId) customerLedgerEntries.delete(key);
+          }
+        } else {
+          customerLedgerEntries.clear();
+        }
+      } else if (normalized.startsWith('DELETE FROM EXPENSE_CATEGORIES_LOCAL')) {
+        expenseCategories.clear();
+      } else if (normalized.startsWith('DELETE FROM EXPENSES_LOCAL')) {
+        if (normalized.includes('WHERE ID = ?')) {
+          expenses.delete(String(params[0] ?? ''));
+        } else {
+          expenses.clear();
+        }
+      } else if (normalized.startsWith('DELETE FROM EXPENSE_AUDIT_LOGS_LOCAL')) {
+        if (normalized.includes('WHERE EXPENSE_ID = ?')) {
+          const targetExpId = String(params[0] ?? '');
+          for (const [key, row] of expenseAuditLogs.entries()) {
+            if (row.expense_id === targetExpId) expenseAuditLogs.delete(key);
+          }
+        } else {
+          expenseAuditLogs.clear();
+        }
       }
       return { changes: 1, lastInsertRowId: 1 };
     },
@@ -536,6 +626,18 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           return (purchases.get(String(params[0] ?? '')) as T | undefined) ?? null;
         }
         return (purchases.values().next().value as T | undefined) ?? null;
+      }
+      if (normalized.includes('FROM CUSTOMERS_LOCAL')) {
+        if (normalized.includes('WHERE ID = ?')) {
+          return (customers.get(String(params[0] ?? '')) as T | undefined) ?? null;
+        }
+        return (customers.values().next().value as T | undefined) ?? null;
+      }
+      if (normalized.includes('FROM EXPENSES_LOCAL')) {
+        if (normalized.includes('WHERE ID = ?')) {
+          return (expenses.get(String(params[0] ?? '')) as T | undefined) ?? null;
+        }
+        return (expenses.values().next().value as T | undefined) ?? null;
       }
       return null;
     },
@@ -679,6 +781,38 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           ) as T[];
         }
         return Array.from(supplierLedgerEntries.values()) as T[];
+      }
+      if (normalized.includes('FROM CUSTOMER_LEDGER_ENTRIES_LOCAL')) {
+        if (normalized.includes('WHERE CUSTOMER_ID = ?')) {
+          const custId = String(params[0] ?? '');
+          return Array.from(customerLedgerEntries.values()).filter(
+            (r) => r.customer_id === custId,
+          ) as T[];
+        }
+        return Array.from(customerLedgerEntries.values()) as T[];
+      }
+      if (normalized.includes('FROM EXPENSE_CATEGORIES_LOCAL')) {
+        const shopFilter = normalized.includes('WHERE SHOP_ID = ?')
+          ? String(params[0] ?? '')
+          : null;
+        return Array.from(expenseCategories.values()).filter(
+          (row) => !shopFilter || row.shop_id === shopFilter,
+        ) as T[];
+      }
+      if (normalized.includes('FROM EXPENSES_LOCAL')) {
+        const shopFilter = normalized.includes('WHERE SHOP_ID = ?')
+          ? String(params[0] ?? '')
+          : null;
+        return Array.from(expenses.values()).filter(
+          (row) => !shopFilter || row.shop_id === shopFilter,
+        ) as T[];
+      }
+      if (normalized.includes('FROM EXPENSE_AUDIT_LOGS_LOCAL')) {
+        if (normalized.includes('WHERE EXPENSE_ID = ?')) {
+          const expId = String(params[0] ?? '');
+          return Array.from(expenseAuditLogs.values()).filter((r) => r.expense_id === expId) as T[];
+        }
+        return Array.from(expenseAuditLogs.values()) as T[];
       }
       return [] as T[];
     },

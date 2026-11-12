@@ -44,6 +44,7 @@ interface SaleRow {
   discount_poisha: number;
   total_poisha: number;
   paid_poisha: number;
+  settled_due_poisha: number | null;
   due_poisha: number;
   tendered_poisha: number | null;
   change_poisha: number;
@@ -223,6 +224,7 @@ function hydrateSale(
     discountPoisha: row.discount_poisha,
     totalPoisha: row.total_poisha,
     paidPoisha: row.paid_poisha,
+    settledDuePoisha: row.settled_due_poisha ?? 0,
     duePoisha: row.due_poisha,
     tenderedPoisha: row.tendered_poisha,
     changePoisha: row.change_poisha,
@@ -273,11 +275,11 @@ async function writeSingleSale(db: SqliteDatabaseAdapter, s: SaleDto): Promise<v
     `INSERT OR REPLACE INTO sales_local (
       id, shop_id, receipt_number, customer_id, customer_name_snapshot,
       status, subtotal_poisha, discount_type, discount_value, discount_poisha,
-      total_poisha, paid_poisha, due_poisha, tendered_poisha, change_poisha,
+      total_poisha, paid_poisha, settled_due_poisha, due_poisha, tendered_poisha, change_poisha,
       returned_total_poisha, cash_refunded_poisha, cogs_poisha, estimated_profit_poisha,
       note, actor_user_id, actor_name, cancelled_at, cancel_reason,
       sold_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     s.id,
     s.shopId,
     s.receiptNumber,
@@ -290,6 +292,7 @@ async function writeSingleSale(db: SqliteDatabaseAdapter, s: SaleDto): Promise<v
     s.discountPoisha,
     s.totalPoisha,
     s.paidPoisha,
+    s.settledDuePoisha,
     s.duePoisha,
     s.tenderedPoisha,
     s.changePoisha,

@@ -122,6 +122,7 @@ export function toSaleDto(sale: SaleWithRelations, role: UserRole): SaleDto {
     discountPoisha: sale.discountPoisha,
     totalPoisha: sale.totalPoisha,
     paidPoisha: sale.paidPoisha,
+    settledDuePoisha: sale.settledDuePoisha,
     duePoisha: sale.duePoisha,
     tenderedPoisha: sale.tenderedPoisha,
     changePoisha: sale.changePoisha,

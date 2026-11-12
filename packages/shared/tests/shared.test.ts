@@ -22,11 +22,13 @@ import {
   formatDhakaDate,
   formatDhakaDateTime,
   formatQuantityDisplay,
+  getDhakaYmd,
   normalizeBdPhone,
   normalizeNumericInput,
   normalizeUnicodeText,
   poishaToBdtString,
   previewPurchaseItemImpact,
+  shiftDhakaYmd,
   subtractPoisha,
   subtractQuantities,
   toBanglaDigits,
@@ -150,6 +152,10 @@ describe('POS discount & Dhaka date helpers', () => {
     expect(formatDhakaDate(iso, 'bn', 'bn')).toBe('১২ নভেম্বর ২০২৬');
     expect(formatDhakaDateTime(iso, 'bn', 'bn')).toBe('১২ নভেম্বর ২০২৬, বিকাল ৩:৩০');
     expect(formatDhakaDateTime(iso, 'en', 'en')).toBe('12 Nov 2026, 3:30 PM');
+
+    // Early morning BST (2026-11-11T19:00:00Z = 2026-11-12 01:00 BST) stays on 2026-11-12
+    expect(getDhakaYmd('2026-11-11T19:00:00.000Z')).toBe('2026-11-12');
+    expect(shiftDhakaYmd('2026-11-12', -6)).toBe('2026-11-06');
   });
 });
 

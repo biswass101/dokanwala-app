@@ -92,3 +92,24 @@ export function formatDhakaDateTime(
   const amPm = hour24 < 12 ? 'AM' : 'PM';
   return `${dateStr}, ${localizedTime} ${amPm}`;
 }
+
+export function getDhakaYmd(input: string | Date = new Date()): string {
+  const shifted = toShiftedDhakaDate(input);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${String(y)}-${m}-${d}`;
+}
+
+export function shiftDhakaYmd(baseYmd: string, deltaDays: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(baseYmd);
+  if (!match) {
+    throw new Error(`Invalid YYYY-MM-DD string: ${baseYmd}`);
+  }
+  const utc = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + deltaDays);
+  const shifted = new Date(utc);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${String(y)}-${m}-${d}`;
+}

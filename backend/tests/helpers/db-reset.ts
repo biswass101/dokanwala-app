@@ -1,6 +1,10 @@
 import { prisma } from '../../src/database/prisma.js';
 
 export async function cleanTestDatabase(): Promise<void> {
+  await prisma.expenseAuditLog.deleteMany();
+  await prisma.expense.deleteMany();
+  await prisma.expenseCategory.deleteMany();
+  await prisma.customerPayment.deleteMany();
   await prisma.purchaseReturnItem.deleteMany();
   await prisma.purchaseReturn.deleteMany();
   await prisma.supplierPayment.deleteMany();

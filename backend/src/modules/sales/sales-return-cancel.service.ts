@@ -222,7 +222,10 @@ export async function createSaleReturn(
         }
         creditAdjustedPoisha = refundTotalPoisha;
       } else {
-        const netPaidCashPoisha = Math.max(0, sale.paidPoisha - sale.cashRefundedPoisha);
+        const netPaidCashPoisha = Math.max(
+          0,
+          sale.paidPoisha + sale.settledDuePoisha - sale.cashRefundedPoisha,
+        );
         cashRefundPoisha = Math.min(refundTotalPoisha, netPaidCashPoisha);
         creditAdjustedPoisha = refundTotalPoisha - cashRefundPoisha;
       }
@@ -495,6 +498,12 @@ export async function cancelSale(
     if (sale.status !== 'COMPLETED') {
       throw new BusinessRuleError(
         'Sales with partial or full returns cannot be voided via cancellation',
+        ErrorCodes.BUSINESS_RULE_VIOLATION,
+      );
+    }
+    if (sale.settledDuePoisha > 0) {
+      throw new BusinessRuleError(
+        'Sales with subsequent due collections cannot be cancelled; process a sale return instead',
         ErrorCodes.BUSINESS_RULE_VIOLATION,
       );
     }

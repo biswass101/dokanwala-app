@@ -9,6 +9,7 @@ import {
 import { env } from '../../config/env.js';
 import { prisma } from '../../database/prisma.js';
 import { ensureDefaultCatalogForShop } from '../catalog/catalog.seed.js';
+import { ensureDefaultExpenseCategoriesForShop } from '../expenses/expense-categories.seed.js';
 import {
   ConflictError,
   ForbiddenError,
@@ -121,6 +122,7 @@ export async function registerShopAndOwner(
     });
 
     await ensureDefaultCatalogForShop(shop.id, tx);
+    await ensureDefaultExpenseCategoriesForShop(shop.id, tx);
 
     await tx.auditLog.create({
       data: {

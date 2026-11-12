@@ -125,6 +125,27 @@ export default function MoreScreen() {
         />
 
         <Button
+          label={t('more.customers')}
+          variant="outline"
+          fullWidth
+          onPress={() => router.push('/customers')}
+        />
+
+        <Button
+          label={t('more.expenses')}
+          variant="outline"
+          fullWidth
+          onPress={() => router.push('/expenses')}
+        />
+
+        <Button
+          label={t('more.newExpense')}
+          variant="outline"
+          fullWidth
+          onPress={() => router.push('/expenses/form')}
+        />
+
+        <Button
           label={t('more.quickPin')}
           variant="secondary"
           fullWidth

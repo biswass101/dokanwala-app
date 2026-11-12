@@ -1,16 +1,20 @@
-import { normalizeBdPhone } from '@dokanwala/shared';
+import { normalizeBdPhone, normalizeUnicodeText } from '@dokanwala/shared';
 import { z } from 'zod';
-import { nfcOptionalString, nfcRequiredString } from '../../shared/validators/common.js';
+import { nfcRequiredString } from '../../shared/validators/common.js';
+
+const ymdDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must use YYYY-MM-DD format');
 
 const optionalBdPhoneSchema = z
-  .string()
-  .trim()
-  .max(20)
+  .union([z.string(), z.null()])
   .transform((val, ctx) => {
-    if (val.length === 0) {
-      return null;
+    if (val === null) return null;
+    const trimmed = val.trim();
+    if (trimmed.length === 0) return null;
+    if (trimmed.length > 20) {
+      ctx.addIssue({ code: 'custom', message: 'Phone number cannot exceed 20 characters' });
+      return z.NEVER;
     }
-    const normalized = normalizeBdPhone(val);
+    const normalized = normalizeBdPhone(trimmed);
     if (!normalized) {
       ctx.addIssue({
         code: 'custom',
@@ -20,15 +24,33 @@ const optionalBdPhoneSchema = z
     }
     return normalized;
   })
-  .nullable()
   .optional();
+
+function nullableNfcOptionalString(max = 300) {
+  return z
+    .union([z.string(), z.null()])
+    .transform((val, ctx) => {
+      if (val === null) return null;
+      const normalized = normalizeUnicodeText(val);
+      if (normalized.length === 0) return null;
+      if (normalized.length > max) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Text cannot exceed ${String(max)} characters`,
+        });
+        return z.NEVER;
+      }
+      return normalized;
+    })
+    .optional();
+}
 
 export const listCustomersQuerySchema = z.strictObject({
   q: z
     .string()
     .trim()
     .max(120)
-    .transform((v) => v.normalize('NFC'))
+    .transform((v) => normalizeUnicodeText(v))
     .optional(),
   withDuesOnly: z
     .enum(['true', 'false'])
@@ -45,11 +67,45 @@ export const listCustomersQuerySchema = z.strictObject({
 export const createCustomerSchema = z.strictObject({
   id: z.uuid().optional(),
   nameBn: nfcRequiredString(1, 150),
-  nameEn: nfcOptionalString(150),
+  nameEn: nullableNfcOptionalString(150),
   phone: optionalBdPhoneSchema,
-  address: nfcOptionalString(300),
-  note: nfcOptionalString(300),
+  address: nullableNfcOptionalString(300),
+  note: nullableNfcOptionalString(300),
+});
+
+export const updateCustomerSchema = z.strictObject({
+  nameBn: nfcRequiredString(1, 150).optional(),
+  nameEn: nullableNfcOptionalString(150),
+  phone: optionalBdPhoneSchema,
+  address: nullableNfcOptionalString(300),
+  note: nullableNfcOptionalString(300),
+  isActive: z.boolean().optional(),
+  confirmWithDue: z.boolean().optional().default(false),
+  expectedVersion: z.number().int().min(1).optional(),
+});
+
+export const customerLedgerQuerySchema = z.strictObject({
+  from: ymdDateSchema.optional(),
+  to: ymdDateSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional().default(200),
+});
+
+export const createCustomerPaymentSchema = z.strictObject({
+  id: z.uuid().optional(),
+  saleId: z.uuid('Invalid sale identifier').nullable().optional(),
+  method: z.enum(['CASH', 'BKASH', 'NAGAD', 'OTHER']),
+  amountPoisha: z
+    .number()
+    .int('Payment amount must be a whole integer in poisha')
+    .min(1, 'Payment amount must be greater than zero')
+    .max(Number.MAX_SAFE_INTEGER),
+  reference: nullableNfcOptionalString(120),
+  note: nullableNfcOptionalString(300),
+  paidAt: z.iso.datetime({ offset: true }).optional(),
 });
 
 export type ListCustomersQuery = z.infer<typeof listCustomersQuerySchema>;
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
+export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
+export type CustomerLedgerQuery = z.infer<typeof customerLedgerQuerySchema>;
+export type CreateCustomerPaymentInput = z.infer<typeof createCustomerPaymentSchema>;

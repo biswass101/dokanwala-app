@@ -93,6 +93,11 @@ function AuthNavigationGate() {
       <Stack.Screen name="purchases/index" />
       <Stack.Screen name="purchases/form" />
       <Stack.Screen name="purchases/[id]" />
+      <Stack.Screen name="customers/index" />
+      <Stack.Screen name="customers/[id]" />
+      <Stack.Screen name="expenses/index" />
+      <Stack.Screen name="expenses/form" />
+      <Stack.Screen name="expenses/[id]" />
     </Stack>
   );
 }

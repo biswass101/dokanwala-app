@@ -8,6 +8,7 @@ export * from './money/sales-calc.js';
 export * from './types/api.js';
 export * from './types/auth.js';
 export * from './types/catalog.js';
+export * from './types/customers-expenses.js';
 export * from './types/purchases.js';
 export * from './types/sales.js';
 export * from './units/conversion.js';

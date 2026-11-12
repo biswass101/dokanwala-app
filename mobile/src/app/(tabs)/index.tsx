@@ -189,13 +189,13 @@ export default function HomeScreen() {
           <Button
             label={t('home.actions.expense')}
             variant="outline"
-            onPress={() => router.push('/(tabs)/more')}
+            onPress={() => router.push('/expenses/form')}
             style={{ flexGrow: 1 }}
           />
           <Button
             label={t('home.actions.collectDue')}
             variant="outline"
-            onPress={() => router.push('/(tabs)/more')}
+            onPress={() => router.push('/customers')}
             style={{ flexGrow: 1 }}
           />
         </View>
