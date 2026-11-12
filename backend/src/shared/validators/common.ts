@@ -63,8 +63,9 @@ export function nfcRequiredString(min = 1, max = 150) {
 
 export function nfcOptionalString(max = 300) {
   return z
-    .string()
+    .union([z.string(), z.null()])
     .transform((val) => {
+      if (val === null) return null;
       const normalized = normalizeUnicodeText(val);
       return normalized.length === 0 ? null : normalized;
     })

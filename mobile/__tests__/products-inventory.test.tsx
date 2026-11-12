@@ -25,6 +25,7 @@ import { resetLocalDatabaseInstanceForTests } from '@/database/sqlite';
 import { openPlatformSqliteDatabase } from '@/database/sqlite-driver.web';
 import { catalogApi } from '@/services/api/catalog';
 import { ApiClientError } from '@/services/api/client';
+import { suppliersApi } from '@/services/api/purchases';
 import { useAuthStore } from '@/store/auth.store';
 import { usePreferencesStore } from '@/store/preferences.store';
 
@@ -365,9 +366,29 @@ describe('Phase 3 Products, Flexible Units & Inventory Mobile UI', () => {
     });
   });
 
-  it('submits new Pan product with Bira conversion and Bangla-digit opening stock', async () => {
+  it('submits new Pan product with Bira conversion, optional English name, available supplier chip, and Bangla-digit opening stock', async () => {
     jest.spyOn(catalogApi, 'listCategories').mockResolvedValue({ categories: sampleCategories });
     jest.spyOn(catalogApi, 'listUnits').mockResolvedValue({ units: sampleUnits });
+    jest.spyOn(suppliersApi, 'list').mockResolvedValue({
+      suppliers: [
+        {
+          id: 'sup-1',
+          shopId: SHOP_ID,
+          nameBn: 'করিম পান আড়ত',
+          nameEn: 'Karim Pan Wholesale',
+          phone: '01722334455',
+          address: 'যশোর',
+          notes: null,
+          totalPurchasedPoisha: 0,
+          totalPaidPoisha: 0,
+          payablePoisha: 0,
+          isActive: true,
+          version: 1,
+          createdAt: '2026-11-12T00:00:00.000Z',
+          updatedAt: '2026-11-12T00:00:00.000Z',
+        },
+      ],
+    });
     const createSpy = jest.spyOn(catalogApi, 'createProduct').mockResolvedValue({
       product: panProduct,
     });
@@ -376,12 +397,15 @@ describe('Phase 3 Products, Flexible Units & Inventory Mobile UI', () => {
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('যেমন: দেশি মিষ্টি পান')).toBeTruthy();
+      expect(screen.queryByPlaceholderText('ঐচ্ছিক বারকোড নম্বর')).toBeNull();
+      expect(screen.getByText('করিম পান আড়ত')).toBeTruthy();
     });
 
     await fireEvent.changeText(
       screen.getByPlaceholderText('যেমন: দেশি মিষ্টি পান'),
       'দেশি মিষ্টি পান',
     );
+    await fireEvent.press(screen.getByText('করিম পান আড়ত'));
     await fireEvent.changeText(screen.getByPlaceholderText('১০.০০'), '১.৫০');
     await fireEvent.changeText(screen.getByPlaceholderText('১০'), '৪০');
 
@@ -397,6 +421,7 @@ describe('Phase 3 Products, Flexible Units & Inventory Mobile UI', () => {
       expect(createSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           nameBn: 'দেশি মিষ্টি পান',
+          defaultSupplierName: 'করিম পান আড়ত',
           baseUnitId: UNIT_PIECE_ID,
           baseSellingPricePoisha: 150,
           lowStockThresholdBase: '40',
@@ -406,6 +431,8 @@ describe('Phase 3 Products, Flexible Units & Inventory Mobile UI', () => {
           ]),
         }),
       );
+      const sentPayload = createSpy.mock.calls[0]?.[0];
+      expect(sentPayload?.nameEn).toBeUndefined();
     });
   });
 

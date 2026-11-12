@@ -1,4 +1,4 @@
-import { formatDhakaDateTime, type ExpenseAuditLogDto } from '@dokanwala/shared';
+import { formatDhakaDateTime, getDhakaYmd, type ExpenseAuditLogDto } from '@dokanwala/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
@@ -76,7 +76,12 @@ export default function ExpenseDetailScreen() {
         <AppText variant="screenTitle" weight="bold" style={{ flex: 1 }}>
           {t('expenses.detailTitle')}
         </AppText>
-        <Button label={t('common.back')} variant="outline" onPress={() => router.back()} />
+        <Button
+          label={t('common.back')}
+          variant="outline"
+          testID="expense-detail-back-btn"
+          onPress={() => router.replace('/expenses')}
+        />
       </View>
 
       {fromOfflineCache ? (
@@ -135,6 +140,17 @@ export default function ExpenseDetailScreen() {
           ) : null}
         </View>
       </Card>
+
+      {/* Quick add another expense on the same date */}
+      <Button
+        label={t('expenses.addMoreExpensesButton')}
+        variant="secondary"
+        fullWidth
+        testID="expense-detail-add-more-btn"
+        onPress={() =>
+          router.push(`/expenses/form?defaultDate=${encodeURIComponent(getDhakaYmd(expense.incurredAt))}`)
+        }
+      />
 
       {/* Owner Edit & Audit History vs Employee Notice */}
       {isOwner ? (

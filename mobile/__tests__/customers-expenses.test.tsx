@@ -46,6 +46,7 @@ import { usePreferencesStore } from '@/store/preferences.store';
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn(() => true);
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
@@ -53,6 +54,7 @@ jest.mock('expo-router', () => ({
     back: mockBack,
     push: mockPush,
     replace: mockReplace,
+    canGoBack: mockCanGoBack,
   }),
   useLocalSearchParams: () => mockSearchParams,
 }));
@@ -553,5 +555,125 @@ describe('Phase 6 Customers, Due Ledger & Expenses UI', () => {
     mockSearchParams = { expenseId: EXPENSE_1_ID };
     await renderWithQuery(<ExpenseFormScreen />);
     expect(screen.getByText('এই কাজটি শুধুমাত্র দোকানের মালিক করতে পারবেন।')).toBeTruthy();
+  });
+
+  it('opens calendar modal to pick date, records multiple same-day items (Mango 60, Banana 120), and routes Back to Expenses', async () => {
+    jest
+      .spyOn(expenseCategoriesApi, 'list')
+      .mockResolvedValue({ categories: [electricCategory, teaCategory] });
+
+    const createdOne: ExpenseDto = {
+      ...sampleExpense,
+      id: 'exp-mango-1',
+      categoryId: EXP_CAT_TEA_ID,
+      categoryNameBn: teaCategory.nameBn,
+      categoryNameEn: teaCategory.nameEn,
+      amountPoisha: 6000,
+      note: 'আম (Mango)',
+      incurredAt: `${todayYmd.slice(0, 8)}05T12:00:00+06:00`,
+    };
+    const createdTwo: ExpenseDto = {
+      ...createdOne,
+      id: 'exp-banana-2',
+      amountPoisha: 12000,
+      note: 'কলা (Banana)',
+    };
+
+    const createSpy = jest
+      .spyOn(expensesApi, 'create')
+      .mockResolvedValueOnce({ expense: createdOne, idempotencyReplayed: false })
+      .mockResolvedValueOnce({ expense: createdTwo, idempotencyReplayed: false });
+
+    await renderWithQuery(<ExpenseFormScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('expense-date-picker-btn')).toBeTruthy();
+    });
+
+    // Open calendar modal and pick day 05 of the current month
+    const targetYmd = `${todayYmd.slice(0, 8)}05`;
+    await fireEvent.press(screen.getByTestId('expense-date-picker-btn'));
+    const dayCell = await screen.findByTestId(`calendar-day-${targetYmd}`);
+    await fireEvent.press(dayCell);
+
+    // Fill first row: Mango 60 tk
+    await fireEvent.changeText(screen.getByTestId('expense-amount-input-0'), '৬০');
+    await fireEvent.changeText(screen.getByTestId('expense-note-input-0'), 'আম (Mango)');
+
+    // Add second row: Banana 120 tk
+    await fireEvent.press(screen.getByTestId('expense-add-item-btn'));
+    await fireEvent.changeText(screen.getByTestId('expense-amount-input-1'), '১২০');
+    await fireEvent.changeText(screen.getByTestId('expense-note-input-1'), 'কলা (Banana)');
+
+    await waitFor(() => {
+      expect(screen.getByText('মোট ২টি আইটেম • সর্বমোট ৳ ১৮০')).toBeTruthy();
+    });
+
+    await fireEvent.press(screen.getByTestId('expense-submit-btn'));
+
+    await waitFor(() => {
+      expect(createSpy).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId('expense-batch-summary')).toBeTruthy();
+      expect(screen.getByText('আম (Mango)')).toBeTruthy();
+      expect(screen.getByText('কলা (Banana)')).toBeTruthy();
+    });
+
+    // Clicking Back from batch summary routes to Expenses Directory (not Home)
+    await fireEvent.press(screen.getByTestId('expense-batch-back-btn'));
+    expect(mockReplace).toHaveBeenCalledWith('/expenses');
+
+    // Verify ExpenseDetailScreen Back button also navigates directly to /expenses
+    await cleanup();
+    mockReplace.mockClear();
+    mockSearchParams = { id: EXPENSE_1_ID };
+    jest.spyOn(expensesApi, 'get').mockResolvedValue({ expense: sampleExpense });
+    jest.spyOn(expensesApi, 'getHistory').mockResolvedValue({
+      expense: sampleExpense,
+      history: sampleAuditLogs,
+    });
+
+    await renderWithQuery(<ExpenseDetailScreen />);
+    const detailBackBtn = await screen.findByTestId('expense-detail-back-btn');
+    await fireEvent.press(detailBackBtn);
+    expect(mockReplace).toHaveBeenCalledWith('/expenses');
+  });
+
+  it('filters Expenses Directory by a specific calendar date and supports prev/next day navigation', async () => {
+    jest
+      .spyOn(expenseCategoriesApi, 'list')
+      .mockResolvedValue({ categories: [electricCategory, teaCategory] });
+    const listSpy = jest.spyOn(expensesApi, 'list').mockResolvedValue({
+      expenses: [sampleExpense],
+      totalExpensePoisha: sampleExpense.amountPoisha,
+    });
+
+    await renderWithQuery(<ExpensesDirectoryScreen />);
+
+    const pickDateBtn = await screen.findByTestId('expenses-specific-date-btn');
+    await fireEvent.press(pickDateBtn);
+
+    const targetYmd = `${todayYmd.slice(0, 8)}05`;
+    const dayCell = await screen.findByTestId(`calendar-day-${targetYmd}`);
+    await fireEvent.press(dayCell);
+
+    await waitFor(() => {
+      expect(listSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ from: targetYmd, to: targetYmd }),
+      );
+      expect(screen.getByTestId('expenses-specific-date-bar')).toBeTruthy();
+    });
+
+    // Clicking Next Day shifts +1 day
+    const nextDayYmd = `${todayYmd.slice(0, 8)}06`;
+    await fireEvent.press(screen.getByTestId('expenses-specific-next-day-btn'));
+    await waitFor(() => {
+      expect(listSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ from: nextDayYmd, to: nextDayYmd }),
+      );
+    });
+
+    // Clicking Add Expense passes defaultDate query param
+    await fireEvent.press(screen.getByTestId('expenses-add-new-btn'));
+    expect(mockPush).toHaveBeenCalledWith(`/expenses/form?defaultDate=${nextDayYmd}`);
   });
 });

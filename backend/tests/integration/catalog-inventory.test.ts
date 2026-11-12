@@ -65,7 +65,7 @@ describe('Phase 3 Products, Flexible Units & Inventory Management API', () => {
     expect(categories.some((c) => c.nameBn === 'পান ও সুপারি')).toBe(true);
     expect(categories.some((c) => c.nameBn === 'জর্দা ও পান মশলা')).toBe(true);
 
-    const { units } = await findDefaultUnitsMap(accessToken);
+    const { map: unitMap, units } = await findDefaultUnitsMap(accessToken);
     expect(units.some((u) => u.code === 'BIRA' && u.nameBn === 'বিড়া')).toBe(true);
     expect(units.some((u) => u.code === 'POYA' && u.nameBn === 'পোয়া')).toBe(true);
 
@@ -92,6 +92,22 @@ describe('Phase 3 Products, Flexible Units & Inventory Management API', () => {
       .delete(`/api/v1/categories/${createCat.body.data.category.id as string}`)
       .set('Authorization', `Bearer ${accessToken}`);
     expect(delCat.status).toBe(200);
+
+    // Optional fields explicitly sent as null (e.g. nameEn, defaultSupplierName) must succeed
+    const nullOptionalProd = await request(app)
+      .post('/api/v1/products')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        nameBn: 'সাদাপাতা',
+        nameEn: null,
+        categoryId: null,
+        defaultSupplierName: null,
+        baseUnitId: requireUnitId(unitMap, 'PIECE'),
+        baseSellingPricePoisha: 500,
+      });
+    expect(nullOptionalProd.status).toBe(201);
+    expect(nullOptionalProd.body.data.product.nameEn).toBeNull();
+    expect(nullOptionalProd.body.data.product.defaultSupplierName).toBeNull();
   });
 
   it('creates Pan & Supari products with flexible unit conversions, Bangla digits, NFC search & low-stock alerts', async () => {

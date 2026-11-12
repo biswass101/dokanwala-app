@@ -5,6 +5,7 @@ import {
   type ExpenseCategoryDto,
   type ExpenseDto,
 } from '@dokanwala/shared';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -12,6 +13,7 @@ import {
   AppText,
   Badge,
   Button,
+  CalendarPickerModal,
   Card,
   EmptyState,
   ErrorState,
@@ -19,6 +21,7 @@ import {
   LoadingView,
   ScreenContainer,
   SyncStatusPill,
+  formatReadableDhakaYmd,
 } from '@/components';
 import { getLocalizedExpenseCategoryName } from '@/features/customers/utils/customer-format';
 import {
@@ -32,13 +35,19 @@ import { useFormattedMoney } from '@/hooks/useFormattedMoney';
 import { Colors } from '@/theme/tokens';
 import { getLocalizedErrorMessage } from '@/utils/api-error-message';
 
-type ExpenseDatePreset = 'ALL' | 'TODAY' | 'LAST_7_DAYS' | 'THIS_MONTH';
+type ExpenseDatePreset = 'ALL' | 'TODAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'CUSTOM_DATE';
 
-const DATE_PRESETS: ExpenseDatePreset[] = ['ALL', 'TODAY', 'LAST_7_DAYS', 'THIS_MONTH'];
+const DATE_PRESETS: ('ALL' | 'TODAY' | 'LAST_7_DAYS' | 'THIS_MONTH')[] = [
+  'ALL',
+  'TODAY',
+  'LAST_7_DAYS',
+  'THIS_MONTH',
+];
 
 function resolveDateRange(
   preset: ExpenseDatePreset,
   todayYmd: string,
+  customDateYmd: string,
 ): { from?: string; to?: string } {
   switch (preset) {
     case 'TODAY':
@@ -47,6 +56,8 @@ function resolveDateRange(
       return { from: shiftDhakaYmd(todayYmd, -6), to: todayYmd };
     case 'THIS_MONTH':
       return { from: `${todayYmd.slice(0, 7)}-01`, to: todayYmd };
+    case 'CUSTOM_DATE':
+      return { from: customDateYmd, to: customDateYmd };
     case 'ALL':
     default:
       return {};
@@ -58,12 +69,17 @@ export default function ExpensesDirectoryScreen() {
   const { digitStyle, formatMoney, formatDigits } = useFormattedMoney();
   const router = useRouter();
 
+  const todayYmd = getDhakaYmd();
   const [search, setSearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [datePreset, setDatePreset] = useState<ExpenseDatePreset>('ALL');
+  const [customDateYmd, setCustomDateYmd] = useState<string>(todayYmd);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
-  const todayYmd = getDhakaYmd();
-  const dateRange = useMemo(() => resolveDateRange(datePreset, todayYmd), [datePreset, todayYmd]);
+  const dateRange = useMemo(
+    () => resolveDateRange(datePreset, todayYmd, customDateYmd),
+    [datePreset, todayYmd, customDateYmd],
+  );
 
   const categoriesQuery = useExpenseCategoriesQuery();
   const expensesQuery = useExpensesQuery({
@@ -101,7 +117,18 @@ export default function ExpensesDirectoryScreen() {
         </AppText>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <SyncStatusPill />
-          <Button label={t('common.back')} variant="outline" onPress={() => router.back()} />
+          <Button
+            label={t('common.back')}
+            variant="outline"
+            testID="expenses-back-btn"
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)');
+              }
+            }}
+          />
         </View>
       </View>
 
@@ -137,7 +164,13 @@ export default function ExpensesDirectoryScreen() {
           <Button
             label={t('expenses.addNewButton')}
             testID="expenses-add-new-btn"
-            onPress={() => router.push('/expenses/form')}
+            onPress={() =>
+              router.push(
+                datePreset === 'CUSTOM_DATE'
+                  ? `/expenses/form?defaultDate=${encodeURIComponent(customDateYmd)}`
+                  : '/expenses/form',
+              )
+            }
           />
         </View>
       </Card>
@@ -149,16 +182,108 @@ export default function ExpensesDirectoryScreen() {
         onChangeText={setSearch}
       />
 
-      {/* Date Presets */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {DATE_PRESETS.map((preset) => (
-          <FilterChip
-            key={preset}
-            label={t(`expenses.dateFilters.${preset}`)}
-            selected={datePreset === preset}
-            onPress={() => setDatePreset(preset)}
-          />
-        ))}
+      {/* Date Presets + Specific Calendar Date */}
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          {DATE_PRESETS.map((preset) => (
+            <FilterChip
+              key={preset}
+              label={t(`expenses.dateFilters.${preset}`)}
+              selected={datePreset === preset}
+              onPress={() => setDatePreset(preset)}
+            />
+          ))}
+          <Pressable
+            accessibilityRole="button"
+            testID="expenses-specific-date-btn"
+            onPress={() => setCalendarOpen(true)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: datePreset === 'CUSTOM_DATE' ? Colors.primary : Colors.border,
+              backgroundColor:
+                datePreset === 'CUSTOM_DATE' ? Colors.primarySoft : Colors.surface,
+            }}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={15}
+              color={datePreset === 'CUSTOM_DATE' ? Colors.primaryPressed : Colors.textSecondary}
+            />
+            <AppText
+              variant="caption"
+              weight="semibold"
+              color={datePreset === 'CUSTOM_DATE' ? Colors.primaryPressed : Colors.textPrimary}
+            >
+              {datePreset === 'CUSTOM_DATE'
+                ? formatReadableDhakaYmd(customDateYmd, language, digitStyle)
+                : t('expenses.pickSpecificDate')}
+            </AppText>
+          </Pressable>
+        </View>
+
+        {datePreset === 'CUSTOM_DATE' ? (
+          <View
+            testID="expenses-specific-date-bar"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: Colors.surface,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              borderRadius: 12,
+              paddingHorizontal: 8,
+              paddingVertical: 6,
+              gap: 8,
+            }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              testID="expenses-specific-prev-day-btn"
+              onPress={() => setCustomDateYmd((d) => shiftDhakaYmd(d, -1))}
+              style={{
+                padding: 8,
+                borderRadius: 8,
+                backgroundColor: Colors.background,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
+            >
+              <Ionicons name="chevron-back" size={16} color={Colors.textPrimary} />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setCalendarOpen(true)}
+              style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}
+            >
+              <AppText variant="body" weight="bold" color={Colors.primaryPressed}>
+                {formatReadableDhakaYmd(customDateYmd, language, digitStyle)}
+              </AppText>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              testID="expenses-specific-next-day-btn"
+              onPress={() => setCustomDateYmd((d) => shiftDhakaYmd(d, 1))}
+              style={{
+                padding: 8,
+                borderRadius: 8,
+                backgroundColor: Colors.background,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
+            >
+              <Ionicons name="chevron-forward" size={16} color={Colors.textPrimary} />
+            </Pressable>
+          </View>
+        ) : null}
       </View>
 
       {/* Category Filter Chips */}
@@ -265,6 +390,16 @@ export default function ExpensesDirectoryScreen() {
           })}
         </View>
       )}
+
+      <CalendarPickerModal
+        visible={calendarOpen}
+        selectedYmd={customDateYmd}
+        onSelectYmd={(ymd) => {
+          setCustomDateYmd(ymd);
+          setDatePreset('CUSTOM_DATE');
+        }}
+        onClose={() => setCalendarOpen(false)}
+      />
     </ScreenContainer>
   );
 }

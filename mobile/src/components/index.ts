@@ -7,6 +7,7 @@ export { ScreenContainer } from './layout/ScreenContainer';
 export { AppText } from './ui/AppText';
 export { Badge } from './ui/Badge';
 export { Button } from './ui/Button';
+export { CalendarPickerModal, formatReadableDhakaYmd } from './ui/CalendarPickerModal';
 export { Card } from './ui/Card';
 export { Input } from './ui/Input';
 export { NumericInput } from './ui/NumericInput';

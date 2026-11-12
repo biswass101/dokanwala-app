@@ -36,6 +36,9 @@ import {
   getLocalizedCategoryName,
   getLocalizedUnitName,
 } from '@/features/products/utils/catalog-format';
+import { SupplierPickerModal } from '@/features/purchases/components/SupplierPickerModal';
+import { useSuppliersQuery } from '@/features/purchases/hooks/usePurchasesQueries';
+import { getLocalizedSupplierName } from '@/features/purchases/utils/purchase-format';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { useFormattedMoney } from '@/hooks/useFormattedMoney';
 import type { ProductUnitInputPayload } from '@/services/api/catalog';
@@ -107,9 +110,15 @@ function ProductFormInner({
   const [categoryId, setCategoryId] = useState<string | null>(
     existingProduct?.categoryId ?? null,
   );
-  const [barcode, setBarcode] = useState(existingProduct?.barcode ?? '');
   const [defaultSupplierName, setDefaultSupplierName] = useState(
     existingProduct?.defaultSupplierName ?? '',
+  );
+  const [supplierPickerOpen, setSupplierPickerOpen] = useState(false);
+
+  const suppliersQuery = useSuppliersQuery();
+  const availableSuppliers = useMemo(
+    () => (suppliersQuery.data?.suppliers ?? []).filter((s) => s.isActive),
+    [suppliersQuery.data?.suppliers],
   );
 
   const [baseUnitId, setBaseUnitId] = useState(initialBaseUnitId);
@@ -355,7 +364,6 @@ function ProductFormInner({
             nameBn: nameBn.trim(),
             nameEn: nameEn.trim() || null,
             categoryId: categoryId ?? null,
-            barcode: barcode.trim() || null,
             defaultSupplierName: defaultSupplierName.trim() || null,
             ...(baseUnitLocked ? {} : { baseUnitId }),
             defaultSaleUnitId: effectiveSaleUnitId,
@@ -373,10 +381,9 @@ function ProductFormInner({
 
       await createMutation.mutateAsync({
         nameBn: nameBn.trim(),
-        nameEn: nameEn.trim() || null,
+        ...(nameEn.trim() ? { nameEn: nameEn.trim() } : {}),
         categoryId: categoryId ?? null,
-        barcode: barcode.trim() || null,
-        defaultSupplierName: defaultSupplierName.trim() || null,
+        ...(defaultSupplierName.trim() ? { defaultSupplierName: defaultSupplierName.trim() } : {}),
         baseUnitId,
         defaultSaleUnitId: effectiveSaleUnitId,
         defaultPurchaseUnitId: effectivePurchaseUnitId,
@@ -447,19 +454,57 @@ function ProductFormInner({
           </View>
         </View>
 
-        <Input
-          label={t('products.barcodeLabel')}
-          placeholder={t('products.barcodePlaceholder')}
-          value={barcode}
-          onChangeText={setBarcode}
-          autoCapitalize="none"
-        />
-        <Input
-          label={t('products.supplierLabel')}
-          placeholder={t('products.supplierPlaceholder')}
-          value={defaultSupplierName}
-          onChangeText={setDefaultSupplierName}
-        />
+        <View style={{ gap: 8 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <AppText variant="caption" weight="semibold" color={Colors.textSecondary}>
+              {t('products.supplierLabel')}
+            </AppText>
+            <Button
+              label={t('products.chooseSupplierButton')}
+              variant="outline"
+              testID="product-supplier-picker-btn"
+              onPress={() => setSupplierPickerOpen(true)}
+            />
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <FilterChip
+              label={t('products.noSupplierSelected')}
+              selected={defaultSupplierName.trim() === ''}
+              onPress={() => setDefaultSupplierName('')}
+            />
+            {availableSuppliers.map((sup) => {
+              const supDisplay = getLocalizedSupplierName(sup, language);
+              const isSelected =
+                defaultSupplierName === sup.nameBn ||
+                (sup.nameEn !== null && defaultSupplierName === sup.nameEn);
+              return (
+                <FilterChip
+                  key={sup.id}
+                  label={supDisplay}
+                  selected={isSelected}
+                  onPress={() => setDefaultSupplierName(sup.nameBn)}
+                />
+              );
+            })}
+            {defaultSupplierName.trim().length > 0 &&
+            !availableSuppliers.some(
+              (s) => s.nameBn === defaultSupplierName || s.nameEn === defaultSupplierName,
+            ) ? (
+              <FilterChip
+                label={defaultSupplierName}
+                selected
+                onPress={() => setDefaultSupplierName(defaultSupplierName)}
+              />
+            ) : null}
+          </View>
+        </View>
       </Card>
 
       {/* Base Unit & Core Pricing */}
@@ -734,6 +779,19 @@ function ProductFormInner({
         fullWidth
         loading={isSubmitting}
         onPress={() => void handleSubmit()}
+      />
+
+      <SupplierPickerModal
+        visible={supplierPickerOpen}
+        selectedSupplierId={
+          availableSuppliers.find(
+            (s) => s.nameBn === defaultSupplierName || s.nameEn === defaultSupplierName,
+          )?.id ?? null
+        }
+        onSelect={(supplier) => {
+          setDefaultSupplierName(supplier ? supplier.nameBn : '');
+        }}
+        onClose={() => setSupplierPickerOpen(false)}
       />
     </ScreenContainer>
   );
