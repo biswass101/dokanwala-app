@@ -113,3 +113,47 @@ export function shiftDhakaYmd(baseYmd: string, deltaDays: number): string {
   const d = String(shifted.getUTCDate()).padStart(2, '0');
   return `${String(y)}-${m}-${d}`;
 }
+
+export function getDhakaMonthStartYmd(baseYmd: string = getDhakaYmd()): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(baseYmd);
+  if (!match?.[1] || !match[2]) {
+    throw new Error(`Invalid YYYY-MM-DD string: ${baseYmd}`);
+  }
+  return `${match[1]}-${match[2]}-01`;
+}
+
+export function getDhakaWeekStartYmd(baseYmd: string = getDhakaYmd()): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(baseYmd);
+  if (!match?.[1] || !match[2] || !match[3]) {
+    throw new Error(`Invalid YYYY-MM-DD string: ${baseYmd}`);
+  }
+  const utc = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const dow = new Date(utc).getUTCDay(); // 0=Sun..6=Sat
+  // Bangladesh retail week starts on Saturday (Sat=0, Sun=1, ..., Fri=6)
+  const offsetFromSat = (dow + 1) % 7;
+  return shiftDhakaYmd(baseYmd, -offsetFromSat);
+}
+
+export function getDhakaMonthKey(baseYmd: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(baseYmd);
+  if (!match?.[1] || !match[2]) {
+    throw new Error(`Invalid YYYY-MM-DD string: ${baseYmd}`);
+  }
+  return `${match[1]}-${match[2]}`;
+}
+
+export function formatDhakaMonthLabel(
+  monthYm: string,
+  language: LanguageCode = 'bn',
+  digitStyle: DigitStyle = 'bn',
+): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(monthYm);
+  if (!match?.[1] || !match[2]) {
+    throw new Error(`Invalid YYYY-MM string: ${monthYm}`);
+  }
+  const monthIdx = Number(match[2]) - 1;
+  const monthName =
+    language === 'bn' ? (BANGLA_MONTHS[monthIdx] ?? '') : (ENGLISH_MONTHS[monthIdx] ?? '');
+  const raw = `${monthName} ${match[1]}`;
+  return digitStyle === 'bn' ? toBanglaDigits(raw) : raw;
+}

@@ -3,6 +3,8 @@ import { MIGRATION_002_PRODUCTS_INVENTORY } from './migrations/002_products_inve
 import { MIGRATION_003_SALES_POS } from './migrations/003_sales_pos';
 import { MIGRATION_004_PURCHASES_SUPPLIERS } from './migrations/004_purchases_suppliers';
 import { MIGRATION_005_CUSTOMERS_EXPENSES } from './migrations/005_customers_expenses';
+import { MIGRATION_006_CASHBOOK_REPORTS } from './migrations/006_cashbook_reports';
+import { MIGRATION_007_OFFLINE_SYNC } from './migrations/007_offline_sync';
 import { openPlatformSqliteDatabase } from './sqlite-driver';
 import type { SqliteDatabaseAdapter } from './sqlite.types';
 
@@ -39,6 +41,16 @@ const MIGRATIONS: readonly MigrationDefinition[] = [
     version: 5,
     name: '005_customers_expenses',
     sql: MIGRATION_005_CUSTOMERS_EXPENSES,
+  },
+  {
+    version: 6,
+    name: '006_cashbook_reports',
+    sql: MIGRATION_006_CASHBOOK_REPORTS,
+  },
+  {
+    version: 7,
+    name: '007_offline_sync',
+    sql: MIGRATION_007_OFFLINE_SYNC,
   },
 ];
 

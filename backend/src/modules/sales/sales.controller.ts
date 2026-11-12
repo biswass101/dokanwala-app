@@ -6,7 +6,9 @@ import type {
   CreateSaleInput,
   CreateSaleReturnInput,
   ListSalesQuery,
+  ReceiptPdfQuery,
 } from './sales.schema.js';
+import { generateSaleReceiptPdf } from './sales-receipt-pdf.service.js';
 import {
   cancelSale,
   createSale,
@@ -128,6 +130,25 @@ export async function cancelSaleHandler(
       },
       200,
     );
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getSaleReceiptPdfHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const auth = requireRequestAuth(req);
+    const { id } = req.params as { id: string };
+    const query = req.query as unknown as ReceiptPdfQuery;
+    const pdf = await generateSaleReceiptPdf(auth.shopId, auth.role, id, query.lang);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${pdf.filename}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).send(pdf.buffer);
   } catch (err) {
     next(err);
   }

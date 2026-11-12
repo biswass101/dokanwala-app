@@ -1,6 +1,12 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+const KNOWN_DEV_JWT_SECRETS = new Set([
+  'replace-with-a-random-minimum-32-character-secret-key',
+  'dokanwala-dev-jwt-secret-key-min-32-chars',
+  'change-me-in-production-min-32-characters',
+]);
+
 const booleanFromEnv = z
   .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
   .transform((val) => val === true || val === 'true' || val === '1');
@@ -23,11 +29,34 @@ const envSchema = z.object({
   AUTH_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
   AUTH_LOCKOUT_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   CORS_ORIGINS: z.string().default(''),
+  TRUST_PROXY: booleanFromEnv.default(false),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(120),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(15),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
+
+export function validateProductionEnv(config: {
+  NODE_ENV: 'development' | 'test' | 'production';
+  JWT_ACCESS_SECRET: string;
+  corsOriginList: readonly string[];
+}): void {
+  if (config.NODE_ENV !== 'production') {
+    return;
+  }
+
+  if (KNOWN_DEV_JWT_SECRETS.has(config.JWT_ACCESS_SECRET)) {
+    throw new Error(
+      'Invalid production configuration: JWT_ACCESS_SECRET must not use a known development placeholder',
+    );
+  }
+
+  if (config.corsOriginList.length === 0) {
+    throw new Error(
+      'Invalid production configuration: CORS_ORIGINS must specify at least one allowed origin',
+    );
+  }
+}
 
 const parsed = envSchema.safeParse(process.env);
 
@@ -38,11 +67,19 @@ if (!parsed.success) {
   throw new Error(`Invalid environment configuration: ${formatted}`);
 }
 
+const corsOriginList = parsed.data.CORS_ORIGINS.split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+
+validateProductionEnv({
+  NODE_ENV: parsed.data.NODE_ENV,
+  JWT_ACCESS_SECRET: parsed.data.JWT_ACCESS_SECRET,
+  corsOriginList,
+});
+
 export const env = {
   ...parsed.data,
-  corsOriginList: parsed.data.CORS_ORIGINS.split(',')
-    .map((origin) => origin.trim())
-    .filter((origin) => origin.length > 0),
+  corsOriginList,
 } as const;
 
 export type AppEnv = typeof env;

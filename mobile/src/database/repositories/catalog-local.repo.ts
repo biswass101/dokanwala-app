@@ -219,6 +219,46 @@ function hydrateProduct(
   };
 }
 
+export async function upsertLocalCategory(cat: CategoryDto): Promise<void> {
+  const db = await getLocalDatabase();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO categories_local (
+      id, shop_id, name_bn, name_en, sort_order, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    cat.id,
+    cat.shopId,
+    cat.nameBn,
+    cat.nameEn,
+    cat.sortOrder,
+    cat.isActive ? 1 : 0,
+    cat.createdAt,
+    cat.updatedAt,
+  );
+}
+
+export async function removeLocalCategory(shopId: string, categoryId: string): Promise<void> {
+  const existing = await loadLocalCategories(shopId, true);
+  await saveLocalCategories(existing.filter((c) => c.id !== categoryId));
+}
+
+export async function upsertLocalUnit(unit: UnitDto): Promise<void> {
+  const db = await getLocalDatabase();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO units_local (
+      id, shop_id, code, name_bn, name_en, is_fractional, is_default, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    unit.id,
+    unit.shopId,
+    unit.code,
+    unit.nameBn,
+    unit.nameEn,
+    unit.isFractional ? 1 : 0,
+    unit.isDefault ? 1 : 0,
+    unit.createdAt,
+    unit.updatedAt,
+  );
+}
+
 export async function saveLocalCategories(categories: readonly CategoryDto[]): Promise<void> {
   const db = await getLocalDatabase();
   await db.withTransactionAsync(async () => {
@@ -322,6 +362,13 @@ export async function replaceLocalProducts(products: readonly ProductDto[]): Pro
   });
 }
 
+export async function writeSingleProductTx(
+  db: SqliteDatabaseAdapter,
+  product: ProductDto,
+): Promise<void> {
+  await writeSingleProduct(db, product);
+}
+
 export async function upsertLocalProduct(product: ProductDto): Promise<void> {
   const db = await getLocalDatabase();
   await db.withTransactionAsync(async () => {
@@ -329,12 +376,19 @@ export async function upsertLocalProduct(product: ProductDto): Promise<void> {
   });
 }
 
+export async function removeLocalProductTx(
+  db: SqliteDatabaseAdapter,
+  productId: string,
+): Promise<void> {
+  await db.runAsync('DELETE FROM product_units_local WHERE product_id = ?', productId);
+  await db.runAsync('DELETE FROM inventory_balances_local WHERE product_id = ?', productId);
+  await db.runAsync('DELETE FROM products_local WHERE id = ?', productId);
+}
+
 export async function removeLocalProduct(productId: string): Promise<void> {
   const db = await getLocalDatabase();
   await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM product_units_local WHERE product_id = ?', productId);
-    await db.runAsync('DELETE FROM inventory_balances_local WHERE product_id = ?', productId);
-    await db.runAsync('DELETE FROM products_local WHERE id = ?', productId);
+    await removeLocalProductTx(db, productId);
   });
 }
 

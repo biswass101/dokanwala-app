@@ -18,6 +18,8 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../../shared/errors/app-error.js';
+import { recordCashbookEntry } from '../cashbook/cashbook-ledger.helper.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import {
   generateDailyNumber,
   InvalidUnitConversionError,
@@ -28,6 +30,12 @@ import {
 import type { CreateSaleInput } from './sales.schema.js';
 import { saleInclude, toSaleDto } from './sales.types.js';
 
+export interface CreateSaleSyncOptions {
+  offlineItemPrices?: readonly number[];
+  allowNegativeStockOverride?: boolean;
+  offlineSoldAt?: string | null;
+}
+
 export async function createSale(
   shopId: string,
   actorUserId: string,
@@ -35,6 +43,32 @@ export async function createSale(
   input: CreateSaleInput,
   meta: RequestMeta,
 ): Promise<{ sale: SaleDto; idempotencyReplayed: boolean }> {
+  const result = await createSaleInternal(shopId, actorUserId, role, input, meta);
+  return {
+    sale: result.sale,
+    idempotencyReplayed: result.idempotencyReplayed,
+  };
+}
+
+export async function createSaleFromSync(
+  shopId: string,
+  actorUserId: string,
+  role: UserRole,
+  input: CreateSaleInput,
+  meta: RequestMeta,
+  syncOptions?: CreateSaleSyncOptions,
+): Promise<{ sale: SaleDto; idempotencyReplayed: boolean; warnings: string[] }> {
+  return createSaleInternal(shopId, actorUserId, role, input, meta, syncOptions);
+}
+
+async function createSaleInternal(
+  shopId: string,
+  actorUserId: string,
+  role: UserRole,
+  input: CreateSaleInput,
+  meta: RequestMeta,
+  syncOptions?: CreateSaleSyncOptions,
+): Promise<{ sale: SaleDto; idempotencyReplayed: boolean; warnings: string[] }> {
   const idempotencyKey = requireIdempotencyKey(meta.idempotencyKey);
 
   const existingReplay = await prisma.sale.findUnique({
@@ -51,11 +85,13 @@ export async function createSale(
     return {
       sale: toSaleDto(existingReplay, role),
       idempotencyReplayed: true,
+      warnings: [],
     };
   }
 
   try {
-    const createdSale = await prisma.$transaction(async (tx) => {
+    const { createdSale, warnings } = await prisma.$transaction(async (tx) => {
+      const txWarnings: string[] = [];
       const shop = await tx.shop.findUnique({
         where: { id: shopId },
         select: {
@@ -72,16 +108,16 @@ export async function createSale(
         new Set(input.items.map((item) => item.productId)),
       ).sort();
 
+      const isOfflineSync = Boolean(syncOptions);
       const products = await tx.product.findMany({
         where: {
           shopId,
           id: { in: uniqueProductIds },
-          deletedAt: null,
-          isActive: true,
+          ...(isOfflineSync ? {} : { deletedAt: null, isActive: true }),
         },
         include: {
           productUnits: {
-            where: { isActive: true },
+            ...(isOfflineSync ? {} : { where: { isActive: true } }),
             include: { unit: true },
           },
         },
@@ -94,6 +130,12 @@ export async function createSale(
           ...(missingId ? { productId: missingId } : {}),
         });
       }
+
+      const archivedProductsSold = isOfflineSync
+        ? products
+            .filter((p) => p.deletedAt !== null || !p.isActive)
+            .map((p) => ({ productId: p.id, nameBn: p.nameBn }))
+        : [];
 
       const productMap = new Map(products.map((p) => [p.id, p]));
       const balanceMap = await lockInventoryBalancesForUpdate(tx, shopId, uniqueProductIds);
@@ -118,8 +160,14 @@ export async function createSale(
 
       let subtotalPoisha = 0;
       let totalCogsPoisha = 0;
+      const priceVariances: Array<{
+        productId: string;
+        lineIndex: number;
+        offlineUnitSellingPricePoisha: number;
+        serverUnitSellingPricePoisha: number;
+      }> = [];
 
-      for (const reqItem of input.items) {
+      for (const [lineIdx, reqItem] of input.items.entries()) {
         const product = productMap.get(reqItem.productId);
         const bal = balanceMap.get(reqItem.productId);
         if (!product || !bal) {
@@ -141,9 +189,26 @@ export async function createSale(
         const prevProductReq = totalRequestedBaseByProduct.get(product.id) ?? new Decimal(0);
         totalRequestedBaseByProduct.set(product.id, prevProductReq.plus(qtyBaseDec));
 
-        const unitSellingPricePoisha =
+        const serverUnitSellingPricePoisha =
           unitRule.sellingPricePoisha ??
           calculateLineTotalPoisha(factorStr, product.baseSellingPricePoisha);
+        const offlineOverridePrice = syncOptions?.offlineItemPrices?.[lineIdx];
+        const unitSellingPricePoisha =
+          offlineOverridePrice !== undefined && offlineOverridePrice >= 0
+            ? offlineOverridePrice
+            : serverUnitSellingPricePoisha;
+
+        if (
+          offlineOverridePrice !== undefined &&
+          offlineOverridePrice !== serverUnitSellingPricePoisha
+        ) {
+          priceVariances.push({
+            productId: product.id,
+            lineIndex: lineIdx,
+            offlineUnitSellingPricePoisha: offlineOverridePrice,
+            serverUnitSellingPricePoisha,
+          });
+        }
 
         const lineSubtotalPoisha = calculateLineTotalPoisha(
           reqItem.qtyDisplay,
@@ -172,13 +237,21 @@ export async function createSale(
         });
       }
 
-      if (!shop.allowNegativeStock) {
-        for (const [productId, requestedDec] of totalRequestedBaseByProduct.entries()) {
-          const bal = balanceMap.get(productId);
-          const product = productMap.get(productId);
-          if (!bal || !product) continue;
+      const allowNegative = shop.allowNegativeStock || Boolean(syncOptions?.allowNegativeStockOverride);
+      const stockDiscrepancies: Array<{
+        productId: string;
+        productNameBn: string;
+        requestedBase: string;
+        availableBase: string;
+      }> = [];
 
-          if (bal.qtyDec.lt(requestedDec)) {
+      for (const [productId, requestedDec] of totalRequestedBaseByProduct.entries()) {
+        const bal = balanceMap.get(productId);
+        const product = productMap.get(productId);
+        if (!bal || !product) continue;
+
+        if (bal.qtyDec.lt(requestedDec)) {
+          if (!allowNegative) {
             throw new ConflictError(
               `Insufficient stock for ${product.nameBn}`,
               ErrorCodes.INSUFFICIENT_STOCK,
@@ -190,6 +263,12 @@ export async function createSale(
               },
             );
           }
+          stockDiscrepancies.push({
+            productId,
+            productNameBn: product.nameBn,
+            requestedBase: requestedDec.toFixed(4),
+            availableBase: bal.qtyDec.toFixed(4),
+          });
         }
       }
 
@@ -310,7 +389,7 @@ export async function createSale(
         });
       }
 
-      const soldAt = new Date();
+      const soldAt = syncOptions?.offlineSoldAt ? new Date(syncOptions.offlineSoldAt) : new Date();
       const receiptNumber = await generateDailyNumber(tx, {
         table: 'sales',
         shopId,
@@ -377,6 +456,22 @@ export async function createSale(
             receivedAt: soldAt,
           })),
         });
+
+        for (const payment of input.payments) {
+          await recordCashbookEntry(tx, {
+            shopId,
+            direction: 'IN',
+            entryType: 'SALE_IN',
+            method: payment.method,
+            amountPoisha: payment.amountPoisha,
+            referenceType: 'SALE',
+            referenceId: sale.id,
+            referenceNumber: receiptNumber,
+            note: customerNameSnapshot ?? input.note ?? null,
+            actorUserId,
+            occurredAt: soldAt,
+          });
+        }
       }
 
       const runningBalanceByProduct = new Map<string, Decimal>(
@@ -436,15 +531,86 @@ export async function createSale(
         },
       });
 
-      return tx.sale.findUniqueOrThrow({
+      if (priceVariances.length > 0) {
+        txWarnings.push('OFFLINE_PRICE_VARIANCE');
+        await tx.auditLog.create({
+          data: {
+            shopId,
+            actorUserId,
+            deviceId: meta.deviceId ?? null,
+            action: 'OFFLINE_PRICE_VARIANCE',
+            entityType: 'Sale',
+            entityId: sale.id,
+            afterJson: { receiptNumber, priceVariances },
+            ipAddress: meta.ipAddress ?? null,
+          },
+        });
+      }
+
+      if (stockDiscrepancies.length > 0) {
+        txWarnings.push('LOW_STOCK_DISCREPANCY');
+        await tx.auditLog.create({
+          data: {
+            shopId,
+            actorUserId,
+            deviceId: meta.deviceId ?? null,
+            action: 'LOW_STOCK_DISCREPANCY',
+            entityType: 'Sale',
+            entityId: sale.id,
+            afterJson: { receiptNumber, stockDiscrepancies },
+            ipAddress: meta.ipAddress ?? null,
+          },
+        });
+      }
+
+      if (archivedProductsSold.length > 0) {
+        txWarnings.push('ARCHIVED_PRODUCT_SOLD');
+        await tx.auditLog.create({
+          data: {
+            shopId,
+            actorUserId,
+            deviceId: meta.deviceId ?? null,
+            action: 'ARCHIVED_PRODUCT_SOLD',
+            entityType: 'Sale',
+            entityId: sale.id,
+            afterJson: { receiptNumber, archivedProductsSold },
+            ipAddress: meta.ipAddress ?? null,
+          },
+        });
+      }
+
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'SALE',
+        entityId: sale.id,
+      });
+      for (const productId of uniqueProductIds) {
+        await recordSyncChange(tx, {
+          shopId,
+          entityType: 'PRODUCT',
+          entityId: productId,
+        });
+      }
+      if (input.customerId) {
+        await recordSyncChange(tx, {
+          shopId,
+          entityType: 'CUSTOMER',
+          entityId: input.customerId,
+        });
+      }
+
+      const fullSale = await tx.sale.findUniqueOrThrow({
         where: { id: sale.id },
         include: saleInclude,
       });
+
+      return { createdSale: fullSale, warnings: txWarnings };
     });
 
     return {
       sale: toSaleDto(createdSale, role),
       idempotencyReplayed: false,
+      warnings,
     };
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -461,6 +627,7 @@ export async function createSale(
         return {
           sale: toSaleDto(winner, role),
           idempotencyReplayed: true,
+          warnings: [],
         };
       }
     }

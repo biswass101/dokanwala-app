@@ -8,8 +8,10 @@ import {
 import { prisma } from '../../database/prisma.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { BusinessRuleError, ConflictError, NotFoundError } from '../../shared/errors/app-error.js';
-import { getDhakaDayRangeUtc } from '../../shared/utils/timezone.js';
+import { formatDhakaYmd, getDhakaDayRangeUtc } from '../../shared/utils/timezone.js';
 import { requireIdempotencyKey, type RequestMeta } from '../../shared/utils/transaction-helpers.js';
+import { recordCashbookEntry } from '../cashbook/cashbook-ledger.helper.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import { ensureDefaultExpenseCategoriesForShop } from './expense-categories.seed.js';
 import type {
   CreateExpenseCategoryInput,
@@ -97,6 +99,12 @@ export async function createExpenseCategory(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'EXPENSE_CATEGORY',
+      entityId: category.id,
+    });
+
     return category;
   });
 
@@ -179,6 +187,12 @@ export async function updateExpenseCategory(
         },
         ipAddress: meta.ipAddress ?? null,
       },
+    });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'EXPENSE_CATEGORY',
+      entityId: category.id,
     });
 
     return category;
@@ -346,6 +360,20 @@ export async function createExpense(
         },
       });
 
+      await recordCashbookEntry(tx, {
+        shopId,
+        direction: 'OUT',
+        entryType: 'EXPENSE_OUT',
+        method: input.method,
+        amountPoisha: input.amountPoisha,
+        referenceType: 'EXPENSE',
+        referenceId: expense.id,
+        referenceNumber: category.nameBn,
+        note: input.note ?? null,
+        actorUserId,
+        occurredAt: incurredAt,
+      });
+
       await tx.auditLog.create({
         data: {
           shopId,
@@ -357,6 +385,12 @@ export async function createExpense(
           afterJson: snapshot as unknown as Prisma.InputJsonValue,
           ipAddress: meta.ipAddress ?? null,
         },
+      });
+
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'EXPENSE',
+        entityId: expense.id,
       });
 
       return expense;
@@ -497,6 +531,68 @@ export async function updateExpense(
       },
     });
 
+    const sameMethod = existing.method === nextMethod;
+    const sameDhakaDay = formatDhakaYmd(existing.incurredAt) === formatDhakaYmd(nextIncurredAt);
+    if (sameMethod && sameDhakaDay) {
+      const deltaPoisha = nextAmountPoisha - existing.amountPoisha;
+      if (deltaPoisha > 0) {
+        await recordCashbookEntry(tx, {
+          shopId,
+          direction: 'OUT',
+          entryType: 'EXPENSE_ADJUST_OUT',
+          method: nextMethod,
+          amountPoisha: deltaPoisha,
+          referenceType: 'EXPENSE',
+          referenceId: saved.id,
+          referenceNumber: nextCategoryNameSnapshot,
+          note: input.reason ?? nextNote ?? null,
+          actorUserId,
+          occurredAt: nextIncurredAt,
+        });
+      } else if (deltaPoisha < 0) {
+        await recordCashbookEntry(tx, {
+          shopId,
+          direction: 'IN',
+          entryType: 'EXPENSE_ADJUST_IN',
+          method: nextMethod,
+          amountPoisha: Math.abs(deltaPoisha),
+          referenceType: 'EXPENSE',
+          referenceId: saved.id,
+          referenceNumber: nextCategoryNameSnapshot,
+          note: input.reason ?? nextNote ?? null,
+          actorUserId,
+          occurredAt: nextIncurredAt,
+        });
+      }
+    } else {
+      await recordCashbookEntry(tx, {
+        shopId,
+        direction: 'IN',
+        entryType: 'EXPENSE_ADJUST_IN',
+        method: existing.method,
+        amountPoisha: existing.amountPoisha,
+        referenceType: 'EXPENSE',
+        referenceId: saved.id,
+        referenceNumber: existing.categoryNameSnapshot,
+        note: input.reason ?? existing.note ?? null,
+        actorUserId,
+        occurredAt: existing.incurredAt,
+      });
+      await recordCashbookEntry(tx, {
+        shopId,
+        direction: 'OUT',
+        entryType: 'EXPENSE_ADJUST_OUT',
+        method: nextMethod,
+        amountPoisha: nextAmountPoisha,
+        referenceType: 'EXPENSE',
+        referenceId: saved.id,
+        referenceNumber: nextCategoryNameSnapshot,
+        note: input.reason ?? nextNote ?? null,
+        actorUserId,
+        occurredAt: nextIncurredAt,
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         shopId,
@@ -509,6 +605,12 @@ export async function updateExpense(
         afterJson: afterSnapshot as unknown as Prisma.InputJsonValue,
         ipAddress: meta.ipAddress ?? null,
       },
+    });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'EXPENSE',
+      entityId: saved.id,
     });
 
     return saved;

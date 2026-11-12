@@ -1,9 +1,14 @@
 import type { AuthSessionResponse, AuthUserDto, ShopProfileDto } from '@dokanwala/shared';
 import { create } from 'zustand';
 import { clearLocalCatalogData } from '@/database/repositories/catalog-local.repo';
+import { clearLocalCashbookReportsData } from '@/database/repositories/cashbook-reports-local.repo';
 import { clearLocalCustomersExpensesData } from '@/database/repositories/customers-expenses-local.repo';
 import { clearLocalPurchasesData } from '@/database/repositories/purchases-local.repo';
 import { clearLocalSalesData } from '@/database/repositories/sales-local.repo';
+import {
+  clearLocalSyncData,
+  recoverInFlightSyncOpsOnStartup,
+} from '@/database/repositories/sync-outbox.repo';
 import {
   clearLocalSessionData,
   loadLocalPreferences,
@@ -57,6 +62,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
 
     await getLocalDatabase();
+    await recoverInFlightSyncOpsOnStartup().catch(() => 0);
 
     const savedPrefs = await loadLocalPreferences();
     if (savedPrefs) {
@@ -187,6 +193,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await clearLocalSalesData();
       await clearLocalPurchasesData();
       await clearLocalCustomersExpensesData();
+      await clearLocalCashbookReportsData();
+      await clearLocalSyncData().catch(() => {});
+      usePreferencesStore.getState().setSyncIndicator('synced', 0);
       useCartStore.getState().clearCart();
       set({
         status: 'unauthenticated',
@@ -225,6 +234,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await clearLocalSalesData();
     await clearLocalPurchasesData();
     await clearLocalCustomersExpensesData();
+    await clearLocalCashbookReportsData();
+    await clearLocalSyncData().catch(() => {});
+    usePreferencesStore.getState().setSyncIndicator('synced', 0);
     useCartStore.getState().clearCart();
     set({
       status: 'unauthenticated',

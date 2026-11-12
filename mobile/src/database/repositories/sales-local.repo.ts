@@ -406,6 +406,48 @@ async function writeSingleSale(db: SqliteDatabaseAdapter, s: SaleDto): Promise<v
   }
 }
 
+export async function writeSingleCustomerTx(
+  db: SqliteDatabaseAdapter,
+  customer: CustomerDto,
+): Promise<void> {
+  await writeSingleCustomer(db, customer);
+}
+
+export async function writeSingleSaleTx(
+  db: SqliteDatabaseAdapter,
+  sale: SaleDto,
+): Promise<void> {
+  await writeSingleSale(db, sale);
+}
+
+export async function removeLocalSaleTx(
+  db: SqliteDatabaseAdapter,
+  saleId: string,
+): Promise<void> {
+  await db.runAsync(
+    'DELETE FROM sale_return_items_local WHERE sale_return_id IN (SELECT id FROM sale_returns_local WHERE sale_id = ?)',
+    saleId,
+  );
+  await db.runAsync('DELETE FROM sale_returns_local WHERE sale_id = ?', saleId);
+  await db.runAsync('DELETE FROM payments_local WHERE sale_id = ?', saleId);
+  await db.runAsync('DELETE FROM sale_items_local WHERE sale_id = ?', saleId);
+  await db.runAsync('DELETE FROM sales_local WHERE id = ?', saleId);
+}
+
+export async function loadLocalCustomerById(customerId: string): Promise<CustomerDto | null> {
+  const db = await getLocalDatabase();
+  const row = await db.getFirstAsync<CustomerRow>(
+    'SELECT * FROM customers_local WHERE id = ? LIMIT 1',
+    customerId,
+  );
+  return row ? hydrateCustomer(row) : null;
+}
+
+export async function removeLocalCustomer(shopId: string, customerId: string): Promise<void> {
+  const existing = await loadLocalCustomers(shopId);
+  await saveLocalCustomers(existing.filter((c) => c.id !== customerId));
+}
+
 export async function saveLocalCustomers(customers: readonly CustomerDto[]): Promise<void> {
   const db = await getLocalDatabase();
   await db.withTransactionAsync(async () => {

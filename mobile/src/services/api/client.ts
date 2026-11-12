@@ -47,9 +47,25 @@ export class ApiClientError extends Error {
 
 const DEFAULT_API_BASE_URL = 'http://localhost:4000/api/v1';
 
+export function assertProductionHttpsUrl(url: string, isDev?: boolean): string {
+  const devMode =
+    isDev ?? (typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production');
+
+  const trimmed = url.trim();
+  if (!devMode && !trimmed.toLowerCase().startsWith('https://')) {
+    throw new Error(
+      `Production EXPO_PUBLIC_API_URL must use https:// for TLS transport security (received: ${trimmed})`,
+    );
+  }
+  return trimmed;
+}
+
 export function getApiBaseUrl(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL?.trim();
-  return configured && configured.length > 0 ? configured : DEFAULT_API_BASE_URL;
+  if (configured && configured.length > 0) {
+    return assertProductionHttpsUrl(configured);
+  }
+  return DEFAULT_API_BASE_URL;
 }
 
 let onSessionInvalidatedCallback: (() => Promise<void> | void) | null = null;

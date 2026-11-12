@@ -67,26 +67,26 @@
 
 ### Phase 7 — Cashbook and Financial Reporting
 
-- [ ] Prisma migration for `CashbookSession`, `CashbookEntry` (and backfill/link ledger flows cleanly)
-- [ ] Backend Daily Cashbook (opening cash, inflows/outflows by Cash/bKash/Nagad, closing count & variance)
-- [ ] Backend Reports in `Asia/Dhaka` boundaries: Dashboard KPIs, Daily/Weekly/Monthly Sales, Product Performance, Inventory Valuation, Profit & Loss (accounting for discounts, returns, COGS, wastage, expenses)
-- [ ] Mobile Dashboard live cards & 5 Quick Actions, Reports tab, Cashbook Open/Close screen
-- [ ] Automated financial reconciliation & P&L verification test suite covering every edge case in `requirements.md` Section 10
+- [x] Prisma migration for `CashbookSession`, `CashbookEntry` (and backfill/link ledger flows cleanly) (`20261112173231_phase7_cashbook_reporting`)
+- [x] Backend Daily Cashbook (opening cash, inflows/outflows by Cash/bKash/Nagad, closing count & variance)
+- [x] Backend Reports in `Asia/Dhaka` boundaries: Dashboard KPIs, Daily/Weekly/Monthly Sales, Product Performance, Inventory Valuation, Profit & Loss (accounting for discounts, returns, COGS, wastage, expenses)
+- [x] Mobile Dashboard live cards & 5 Quick Actions, Reports tab, Cashbook Open/Close screen
+- [x] Automated financial reconciliation & P&L verification test suite covering every edge case in `requirements.md` Section 10
 
 ### Phase 8 — Offline Synchronization
 
-- [ ] Prisma `SyncOperation` & monotonic `syncSeq` delta support (`POST /sync/push`, `GET /sync/pull`)
-- [ ] Mobile SQLite full transactional local writes + `sync_outbox` queue + causal dependency ordering + crash recovery
-- [ ] Background/NetInfo sync worker + exponential backoff + Conflict resolution UI (`CONFLICT` inspector) + persistent Sync Status Pill
-- [ ] Tests: Offline sale -> restart -> reconnect -> idempotent push -> delta pull, conflict detection & resolution without silent overwrites
+- [x] Prisma `SyncOperation` & monotonic `syncSeq` delta support (`POST /sync/push`, `GET /sync/pull`) (`20261112181511_phase8_offline_sync`)
+- [x] Mobile SQLite full transactional local writes + `sync_outbox` queue + causal dependency ordering + crash recovery
+- [x] Background/NetInfo sync worker + exponential backoff + Conflict resolution UI (`CONFLICT` inspector) + persistent Sync Status Pill
+- [x] Tests: Offline sale -> restart -> reconnect -> idempotent push -> delta pull, conflict detection & resolution without silent overwrites
 
-### Phase 9 — Production Readiness
+### Phase 9 — Production Readiness _(Completed)_
 
-- [ ] Comprehensive security audit & index performance review (`EXPLAIN ANALYZE` on ledger/report queries)
-- [ ] UTF-8 BOM CSV export & embedded `Noto Sans Bengali` PDF export for reports & receipts
-- [ ] Shop JSON Backup Export & Validated Restore workflow
-- [ ] App icon, splash screen, Android `app.json`/EAS release config (HTTPS enforcement, clean permissions)
-- [ ] Final production documentation (`README.md`, deployment & backup runbook) & release regression suite
+- [x] Comprehensive security audit & index performance review (`EXPLAIN ANALYZE` on ledger/report queries, `20261112191136_phase9_production_indexes`)
+- [x] UTF-8 BOM CSV export & embedded `Noto Sans Bengali` PDF export for reports & receipts
+- [x] Shop JSON Backup Export & Validated Restore workflow (SHA-256 checksum verification, atomic tenant-scoped `$transaction`, credential preservation)
+- [x] App icon, splash screen, Android `app.json`/EAS release config (`eas.json`, HTTPS enforcement, clean permissions)
+- [x] Final production documentation (`README.md`, [`08-production-deployment-runbook.md`](./08-production-deployment-runbook.md)) & release regression suite
 
 ---
 

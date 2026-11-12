@@ -21,7 +21,11 @@ import {
   formatBdt,
   formatDhakaDate,
   formatDhakaDateTime,
+  formatDhakaMonthLabel,
   formatQuantityDisplay,
+  getDhakaMonthKey,
+  getDhakaMonthStartYmd,
+  getDhakaWeekStartYmd,
   getDhakaYmd,
   normalizeBdPhone,
   normalizeNumericInput,
@@ -156,6 +160,10 @@ describe('POS discount & Dhaka date helpers', () => {
     // Early morning BST (2026-11-11T19:00:00Z = 2026-11-12 01:00 BST) stays on 2026-11-12
     expect(getDhakaYmd('2026-11-11T19:00:00.000Z')).toBe('2026-11-12');
     expect(shiftDhakaYmd('2026-11-12', -6)).toBe('2026-11-06');
+    expect(getDhakaMonthStartYmd('2026-11-12')).toBe('2026-11-01');
+    expect(getDhakaWeekStartYmd('2026-11-12')).toBe('2026-11-07'); // 2026-11-12 is Thu -> Sat Nov 7
+    expect(getDhakaMonthKey('2026-11-12')).toBe('2026-11');
+    expect(formatDhakaMonthLabel('2026-11', 'bn', 'bn')).toBe('নভেম্বর ২০২৬');
   });
 });
 

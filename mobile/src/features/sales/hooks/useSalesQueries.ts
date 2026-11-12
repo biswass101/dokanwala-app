@@ -1,6 +1,12 @@
 import type { CustomerDto, SaleDto, SaleStatus } from '@dokanwala/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  cancelOfflineSaleWithOutbox,
+  createOfflineCustomerWithOutbox,
+  createOfflineSaleReturnWithOutbox,
+  createOfflineSaleWithOutbox,
+} from '@/database/repositories/offline-writes.repo';
+import {
   loadLocalCustomers,
   loadLocalSaleById,
   loadLocalSales,
@@ -10,6 +16,10 @@ import {
   upsertLocalSale,
 } from '@/database/repositories/sales-local.repo';
 import { ApiClientError } from '@/services/api/client';
+import {
+  executeOnlineOrOffline,
+  getOfflineActorContext,
+} from '@/services/sync/offline-mutation-helper';
 import {
   customersApi,
   salesApi,
@@ -73,7 +83,13 @@ export function useCustomersQuery(params?: { q?: string; withDuesOnly?: boolean 
 export function useCreateCustomerMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateCustomerPayload) => customersApi.create(payload),
+    mutationFn: (payload: CreateCustomerPayload) =>
+      executeOnlineOrOffline({
+        onlineFn: () => customersApi.create(payload),
+        offlineFn: async () => ({
+          customer: await createOfflineCustomerWithOutbox(getOfflineActorContext(), payload),
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalCustomer(res.customer);
       await queryClient.invalidateQueries({ queryKey: salesKeys.customersAll });
@@ -186,7 +202,17 @@ export function useCreateSaleMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { payload: CreateSalePayload; idempotencyKey?: string }) =>
-      salesApi.create(input.payload, input.idempotencyKey),
+      executeOnlineOrOffline({
+        onlineFn: () => salesApi.create(input.payload, input.idempotencyKey),
+        offlineFn: async () => ({
+          sale: await createOfflineSaleWithOutbox(
+            getOfflineActorContext(),
+            input.payload,
+            input.idempotencyKey,
+          ),
+          idempotencyReplayed: false,
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalSale(res.sale);
       await Promise.all([
@@ -194,6 +220,8 @@ export function useCreateSaleMutation() {
         queryClient.invalidateQueries({ queryKey: salesKeys.customersAll }),
         queryClient.invalidateQueries({ queryKey: ['catalog'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
       ]);
     },
   });
@@ -203,7 +231,26 @@ export function useCreateSaleReturnMutation(saleId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { payload: CreateSaleReturnPayload; idempotencyKey?: string }) =>
-      salesApi.createReturn(saleId, input.payload, input.idempotencyKey),
+      executeOnlineOrOffline({
+        onlineFn: () => salesApi.createReturn(saleId, input.payload, input.idempotencyKey),
+        offlineFn: async () => {
+          const sale = await createOfflineSaleReturnWithOutbox(
+            getOfflineActorContext(),
+            saleId,
+            input.payload,
+            input.idempotencyKey,
+          );
+          const latestReturn = sale.returns[sale.returns.length - 1];
+          if (!latestReturn) {
+            throw new Error('Offline sale return missing');
+          }
+          return {
+            sale,
+            saleReturn: latestReturn,
+            idempotencyReplayed: false,
+          };
+        },
+      }),
     onSuccess: async (res) => {
       await upsertLocalSale(res.sale);
       await Promise.all([
@@ -211,6 +258,8 @@ export function useCreateSaleReturnMutation(saleId: string) {
         queryClient.invalidateQueries({ queryKey: salesKeys.customersAll }),
         queryClient.invalidateQueries({ queryKey: ['catalog'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
       ]);
     },
   });
@@ -220,7 +269,18 @@ export function useCancelSaleMutation(saleId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { payload: CancelSalePayload; idempotencyKey?: string }) =>
-      salesApi.cancel(saleId, input.payload, input.idempotencyKey),
+      executeOnlineOrOffline({
+        onlineFn: () => salesApi.cancel(saleId, input.payload, input.idempotencyKey),
+        offlineFn: async () => ({
+          sale: await cancelOfflineSaleWithOutbox(
+            getOfflineActorContext(),
+            saleId,
+            input.payload,
+            input.idempotencyKey,
+          ),
+          idempotencyReplayed: false,
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalSale(res.sale);
       await Promise.all([
@@ -228,6 +288,8 @@ export function useCancelSaleMutation(saleId: string) {
         queryClient.invalidateQueries({ queryKey: salesKeys.customersAll }),
         queryClient.invalidateQueries({ queryKey: ['catalog'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
       ]);
     },
   });

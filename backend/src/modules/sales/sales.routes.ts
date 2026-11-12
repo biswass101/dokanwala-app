@@ -7,6 +7,7 @@ import {
   createSaleHandler,
   createSaleReturnHandler,
   getSaleByIdHandler,
+  getSaleReceiptPdfHandler,
   listSalesHandler,
 } from './sales.controller.js';
 import {
@@ -14,6 +15,7 @@ import {
   createSaleReturnSchema,
   createSaleSchema,
   listSalesQuerySchema,
+  receiptPdfQuerySchema,
 } from './sales.schema.js';
 
 export const salesRouter = Router();
@@ -25,6 +27,12 @@ salesRouter.get('/', validateRequest({ query: listSalesQuerySchema }), listSales
 salesRouter.post('/', validateRequest({ body: createSaleSchema }), createSaleHandler);
 
 salesRouter.get('/:id', validateRequest({ params: uuidParamSchema }), getSaleByIdHandler);
+
+salesRouter.get(
+  '/:id/receipt/pdf',
+  validateRequest({ params: uuidParamSchema, query: receiptPdfQuerySchema }),
+  getSaleReceiptPdfHandler,
+);
 
 salesRouter.post(
   '/:id/returns',

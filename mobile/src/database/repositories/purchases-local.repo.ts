@@ -368,6 +368,34 @@ async function writeSinglePurchase(db: SqliteDatabaseAdapter, p: PurchaseDto): P
   }
 }
 
+export async function writeSingleSupplierTx(
+  db: SqliteDatabaseAdapter,
+  supplier: SupplierDto,
+): Promise<void> {
+  await writeSingleSupplier(db, supplier);
+}
+
+export async function writeSinglePurchaseTx(
+  db: SqliteDatabaseAdapter,
+  purchase: PurchaseDto,
+): Promise<void> {
+  await writeSinglePurchase(db, purchase);
+}
+
+export async function loadLocalSupplierById(supplierId: string): Promise<SupplierDto | null> {
+  const db = await getLocalDatabase();
+  const row = await db.getFirstAsync<SupplierRow>(
+    'SELECT * FROM suppliers_local WHERE id = ? LIMIT 1',
+    supplierId,
+  );
+  return row ? hydrateSupplier(row) : null;
+}
+
+export async function removeLocalSupplier(shopId: string, supplierId: string): Promise<void> {
+  const existing = await loadLocalSuppliers(shopId, { includeInactive: true });
+  await saveLocalSuppliers(existing.filter((s) => s.id !== supplierId));
+}
+
 export async function saveLocalSuppliers(suppliers: readonly SupplierDto[]): Promise<void> {
   const db = await getLocalDatabase();
   await db.withTransactionAsync(async () => {

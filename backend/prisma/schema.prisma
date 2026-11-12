@@ -87,6 +87,42 @@ enum ExpenseAuditAction {
   UPDATED
 }
 
+enum CashbookSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashbookDirection {
+  IN
+  OUT
+}
+
+enum CashbookEntryType {
+  SALE_IN
+  DUE_COLLECTION_IN
+  PURCHASE_REFUND_IN
+  OWNER_CASH_IN
+  EXPENSE_ADJUST_IN
+  SALE_REFUND_OUT
+  SALE_CANCEL_OUT
+  PURCHASE_OUT
+  SUPPLIER_PAYMENT_OUT
+  EXPENSE_OUT
+  EXPENSE_ADJUST_OUT
+  OWNER_DRAWING_OUT
+}
+
+enum SyncOperationStatus {
+  APPLIED
+  CONFLICT
+  FAILED
+}
+
+enum SyncChangeAction {
+  UPSERT
+  DELETE
+}
+
 model SystemMetadata {
   key       String   @id @db.VarChar(100)
   value     String   @db.Text
@@ -142,6 +178,10 @@ model Shop {
   expenseCategories   ExpenseCategory[]
   expenses            Expense[]
   expenseAuditLogs    ExpenseAuditLog[]
+  cashbookSessions    CashbookSession[]
+  cashbookEntries     CashbookEntry[]
+  syncOperations      SyncOperation[]
+  syncChanges         SyncChange[]
 
   @@map("shops")
 }
@@ -177,6 +217,10 @@ model User {
   customerPayments        CustomerPayment[]
   expensesRecorded        Expense[]
   expenseAuditLogs        ExpenseAuditLog[]
+  cashbookSessionsOpened  CashbookSession[] @relation("CashbookOpenedBy")
+  cashbookSessionsClosed  CashbookSession[] @relation("CashbookClosedBy")
+  cashbookEntriesRecorded CashbookEntry[]
+  syncOperations          SyncOperation[]
 
   @@index([shopId, isActive])
   @@map("users")
@@ -385,6 +429,7 @@ model StockAdjustment {
   actorUser User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@unique([shopId, idempotencyKey])
+  @@index([shopId, adjustedAt(sort: Desc)])
   @@index([shopId, productId, adjustedAt(sort: Desc)])
   @@index([shopId, adjustmentType, adjustedAt(sort: Desc)])
   @@map("stock_adjustments")
@@ -536,6 +581,7 @@ model SaleReturn {
 
   @@unique([shopId, returnNumber])
   @@unique([shopId, idempotencyKey])
+  @@index([shopId, returnedAt(sort: Desc)])
   @@index([shopId, saleId, returnedAt(sort: Desc)])
   @@map("sale_returns")
 }
@@ -681,6 +727,7 @@ model PurchaseReturn {
 
   @@unique([shopId, returnNumber])
   @@unique([shopId, idempotencyKey])
+  @@index([shopId, returnedAt(sort: Desc)])
   @@index([shopId, purchaseId, returnedAt(sort: Desc)])
   @@map("purchase_returns")
 }
@@ -820,4 +867,103 @@ model ExpenseAuditLog {
 
   @@index([shopId, expenseId, occurredAt(sort: Desc)])
   @@map("expense_audit_logs")
+}
+
+model CashbookSession {
+  id                        String                @id @default(uuid()) @db.Uuid
+  shopId                    String                @map("shop_id") @db.Uuid
+  businessDate              String                @map("business_date") @db.VarChar(10)
+  status                    CashbookSessionStatus @default(OPEN)
+  openingCashPoisha         Int                   @map("opening_cash_poisha")
+  expectedClosingCashPoisha Int                   @default(0) @map("expected_closing_cash_poisha")
+  actualClosingCashPoisha   Int?                  @map("actual_closing_cash_poisha")
+  variancePoisha            Int?                  @map("variance_poisha")
+  note                      String?               @db.VarChar(300)
+  openedByUserId            String?               @map("opened_by_user_id") @db.Uuid
+  closedByUserId            String?               @map("closed_by_user_id") @db.Uuid
+  openedAt                  DateTime              @default(now()) @map("opened_at")
+  closedAt                  DateTime?             @map("closed_at")
+  version                   Int                   @default(1)
+  createdAt                 DateTime              @default(now()) @map("created_at")
+  updatedAt                 DateTime              @updatedAt @map("updated_at")
+
+  shop         Shop            @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  openedByUser User?           @relation("CashbookOpenedBy", fields: [openedByUserId], references: [id], onDelete: SetNull)
+  closedByUser User?           @relation("CashbookClosedBy", fields: [closedByUserId], references: [id], onDelete: SetNull)
+  entries      CashbookEntry[]
+
+  @@unique([shopId, businessDate])
+  @@index([shopId, businessDate(sort: Desc)])
+  @@map("cashbook_sessions")
+}
+
+model CashbookEntry {
+  id              String            @id @default(uuid()) @db.Uuid
+  shopId          String            @map("shop_id") @db.Uuid
+  sessionId       String?           @map("session_id") @db.Uuid
+  direction       CashbookDirection
+  entryType       CashbookEntryType @map("entry_type")
+  method          PaymentMethod
+  amountPoisha    Int               @map("amount_poisha")
+  referenceType   String?           @map("reference_type") @db.VarChar(40)
+  referenceId     String?           @map("reference_id") @db.Uuid
+  referenceNumber String?           @map("reference_number") @db.VarChar(60)
+  note            String?           @db.VarChar(300)
+  idempotencyKey  String?           @map("idempotency_key") @db.VarChar(120)
+  actorUserId     String?           @map("actor_user_id") @db.Uuid
+  occurredAt      DateTime          @default(now()) @map("occurred_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  shop      Shop             @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  session   CashbookSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  actorUser User?            @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, occurredAt(sort: Desc), method])
+  @@index([shopId, sessionId, occurredAt(sort: Desc)])
+  @@index([shopId, referenceType, referenceId])
+  @@map("cashbook_entries")
+}
+
+model SyncOperation {
+  id             String              @id @default(uuid()) @db.Uuid
+  shopId         String              @map("shop_id") @db.Uuid
+  actorUserId    String?             @map("actor_user_id") @db.Uuid
+  deviceId       String?             @map("device_id") @db.VarChar(120)
+  clientOpId     String              @map("client_op_id") @db.Uuid
+  idempotencyKey String              @map("idempotency_key") @db.VarChar(120)
+  opType         String              @map("op_type") @db.VarChar(60)
+  entityType     String              @map("entity_type") @db.VarChar(60)
+  entityId       String              @map("entity_id") @db.Uuid
+  status         SyncOperationStatus
+  syncSeq        BigInt              @default(dbgenerated("nextval('sync_seq_global')")) @map("sync_seq")
+  resultJson     Json?               @map("result_json")
+  errorCode      String?             @map("error_code") @db.VarChar(60)
+  errorMessage   String?             @map("error_message") @db.VarChar(300)
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  shop      Shop  @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([shopId, syncSeq(sort: Asc)])
+  @@index([shopId, entityType, entityId])
+  @@index([shopId, createdAt(sort: Desc)])
+  @@index([shopId, clientOpId])
+  @@map("sync_operations")
+}
+
+model SyncChange {
+  syncSeq    BigInt           @id @default(dbgenerated("nextval('sync_seq_global')")) @map("sync_seq")
+  shopId     String           @map("shop_id") @db.Uuid
+  entityType String           @map("entity_type") @db.VarChar(60)
+  entityId   String           @map("entity_id") @db.Uuid
+  action     SyncChangeAction @default(UPSERT)
+  occurredAt DateTime         @default(now()) @map("occurred_at")
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Restrict)
+
+  @@index([shopId, syncSeq(sort: Asc)])
+  @@index([shopId, entityType, entityId])
+  @@map("sync_changes")
 }

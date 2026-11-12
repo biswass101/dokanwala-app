@@ -19,9 +19,11 @@ import {
 } from '@/features/sales/utils/receipt-format';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { useFormattedMoney } from '@/hooks/useFormattedMoney';
+import { salesApi } from '@/services/api/sales';
 import { useAuthStore } from '@/store/auth.store';
 import { Colors } from '@/theme/tokens';
 import { getLocalizedErrorMessage } from '@/utils/api-error-message';
+import { printPdfBytesOrShare, saveAndShareBytes } from '@/utils/file-export';
 
 export default function ReceiptScreen() {
   const { t, language } = useAppTranslation();
@@ -33,6 +35,8 @@ export default function ReceiptScreen() {
   const shop = useAuthStore((s) => s.shop);
   const detailQuery = useSaleDetailQuery(saleId);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState<'share' | 'print' | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const sale = detailQuery.data?.sale;
 
@@ -79,6 +83,7 @@ export default function ReceiptScreen() {
 
   const handleShare = async () => {
     setShareFeedback(null);
+    setPdfError(null);
     try {
       await Share.share({
         message: shareText,
@@ -94,6 +99,34 @@ export default function ReceiptScreen() {
     }
   };
 
+  const handleReceiptPdf = async (mode: 'share' | 'print') => {
+    setShareFeedback(null);
+    setPdfError(null);
+    setPdfBusy(mode);
+    try {
+      const pdf = await salesApi.downloadReceiptPdf(sale.id, language);
+      if (mode === 'print') {
+        await printPdfBytesOrShare({
+          bytes: pdf.bytes,
+          filename: pdf.filename,
+          dialogTitle: `${t('receipt.title')} - ${sale.receiptNumber}`,
+        });
+      } else {
+        await saveAndShareBytes({
+          bytes: pdf.bytes,
+          filename: pdf.filename,
+          mimeType: 'application/pdf',
+          dialogTitle: `${t('receipt.title')} - ${sale.receiptNumber}`,
+        });
+      }
+      setShareFeedback(t('receipt.pdfSavedFeedback'));
+    } catch (err) {
+      setPdfError(getLocalizedErrorMessage(err, t));
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
   return (
     <ScreenContainer>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -104,9 +137,20 @@ export default function ReceiptScreen() {
       </View>
 
       {shareFeedback ? (
-        <Card style={{ backgroundColor: Colors.successSoft, borderColor: '#A7F3D0', padding: 10 }}>
+        <Card
+          testID="receipt-feedback-banner"
+          style={{ backgroundColor: Colors.successSoft, borderColor: '#A7F3D0', padding: 10 }}
+        >
           <AppText variant="caption" weight="semibold" color={Colors.success}>
             {shareFeedback}
+          </AppText>
+        </Card>
+      ) : null}
+
+      {pdfError ? (
+        <Card style={{ backgroundColor: Colors.dangerSoft, borderColor: '#FECACA', padding: 10 }}>
+          <AppText variant="caption" weight="semibold" color={Colors.danger}>
+            {pdfError}
           </AppText>
         </Card>
       ) : null}
@@ -286,6 +330,24 @@ export default function ReceiptScreen() {
       </Card>
 
       <View style={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Button
+            label={t('receipt.pdfButton')}
+            testID="receipt-pdf-btn"
+            variant="secondary"
+            loading={pdfBusy === 'share'}
+            onPress={() => void handleReceiptPdf('share')}
+            style={{ flex: 1 }}
+          />
+          <Button
+            label={t('receipt.printButton')}
+            testID="receipt-print-btn"
+            variant="outline"
+            loading={pdfBusy === 'print'}
+            onPress={() => void handleReceiptPdf('print')}
+            style={{ flex: 1 }}
+          />
+        </View>
         <Button label={t('receipt.shareButton')} fullWidth onPress={() => void handleShare()} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Button

@@ -20,7 +20,9 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingView } from '@/components';
+import { startSyncEngine, stopSyncEngine } from '@/services/sync/sync-engine';
 import { useAuthStore } from '@/store/auth.store';
+import { useSyncStore } from '@/store/sync.store';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -42,6 +44,20 @@ function AuthNavigationGate() {
   useEffect(() => {
     void bootstrapSession();
   }, [bootstrapSession]);
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      startSyncEngine(queryClient);
+      return () => {
+        stopSyncEngine();
+      };
+    }
+    stopSyncEngine();
+    if (status === 'unauthenticated') {
+      useSyncStore.getState().resetSyncStore();
+    }
+    return undefined;
+  }, [status]);
 
   useEffect(() => {
     if (status === 'booting') return;
@@ -98,6 +114,9 @@ function AuthNavigationGate() {
       <Stack.Screen name="expenses/index" />
       <Stack.Screen name="expenses/form" />
       <Stack.Screen name="expenses/[id]" />
+      <Stack.Screen name="cashbook/index" />
+      <Stack.Screen name="sync/index" />
+      <Stack.Screen name="backup/index" />
     </Stack>
   );
 }

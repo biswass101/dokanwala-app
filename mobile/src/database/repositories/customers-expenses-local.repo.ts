@@ -11,6 +11,7 @@ import {
   type RefundMethod,
 } from '@dokanwala/shared';
 import { getLocalDatabase } from '../sqlite';
+import type { SqliteDatabaseAdapter } from '../sqlite.types';
 import { upsertLocalCustomer } from './sales-local.repo';
 
 interface CustomerRow {
@@ -237,8 +238,10 @@ export async function saveLocalExpenseCategories(categories: ExpenseCategoryDto[
   });
 }
 
-export async function upsertLocalExpenseCategory(c: ExpenseCategoryDto): Promise<void> {
-  const db = await getLocalDatabase();
+export async function upsertLocalExpenseCategoryTx(
+  db: SqliteDatabaseAdapter,
+  c: ExpenseCategoryDto,
+): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO expense_categories_local (
       id, shop_id, name_bn, name_en, is_default, sort_order, is_active,
@@ -255,6 +258,16 @@ export async function upsertLocalExpenseCategory(c: ExpenseCategoryDto): Promise
     c.createdAt,
     c.updatedAt,
   );
+}
+
+export async function upsertLocalExpenseCategory(c: ExpenseCategoryDto): Promise<void> {
+  const db = await getLocalDatabase();
+  await upsertLocalExpenseCategoryTx(db, c);
+}
+
+export async function removeLocalExpenseCategory(shopId: string, categoryId: string): Promise<void> {
+  const existing = await loadLocalExpenseCategories(shopId);
+  await saveLocalExpenseCategories(existing.filter((c) => c.id !== categoryId));
 }
 
 export async function loadLocalExpenseCategories(shopId: string): Promise<ExpenseCategoryDto[]> {
@@ -300,8 +313,10 @@ export async function replaceLocalExpenses(expenses: ExpenseDto[]): Promise<void
   });
 }
 
-export async function upsertLocalExpense(e: ExpenseDto): Promise<void> {
-  const db = await getLocalDatabase();
+export async function upsertLocalExpenseTx(
+  db: SqliteDatabaseAdapter,
+  e: ExpenseDto,
+): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO expenses_local (
       id, shop_id, category_id, category_name_bn, category_name_en,
@@ -324,6 +339,11 @@ export async function upsertLocalExpense(e: ExpenseDto): Promise<void> {
     e.createdAt,
     e.updatedAt,
   );
+}
+
+export async function upsertLocalExpense(e: ExpenseDto): Promise<void> {
+  const db = await getLocalDatabase();
+  await upsertLocalExpenseTx(db, e);
 }
 
 export async function loadLocalExpenses(

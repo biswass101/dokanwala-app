@@ -17,6 +17,11 @@ import { prisma } from '../../database/prisma.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { BusinessRuleError, ConflictError, NotFoundError } from '../../shared/errors/app-error.js';
 import {
+  mapPurchaseRefundMethodToPaymentMethod,
+  recordCashbookEntry,
+} from '../cashbook/cashbook-ledger.helper.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
+import {
   generateDailyNumber,
   lockInventoryBalancesForUpdate,
   requireIdempotencyKey,
@@ -302,6 +307,23 @@ export async function createPurchaseReturn(
         },
       });
 
+      const refundMethodForCashbook = mapPurchaseRefundMethodToPaymentMethod(input.refundMethod);
+      if (refundMethodForCashbook && cashRefundPoisha > 0) {
+        await recordCashbookEntry(tx, {
+          shopId,
+          direction: 'IN',
+          entryType: 'PURCHASE_REFUND_IN',
+          method: refundMethodForCashbook,
+          amountPoisha: cashRefundPoisha,
+          referenceType: 'PURCHASE_RETURN',
+          referenceId: purchaseReturn.id,
+          referenceNumber: returnNumber,
+          note: input.reason ?? purchase.purchaseNumber,
+          actorUserId,
+          occurredAt: returnedAt,
+        });
+      }
+
       await tx.purchaseReturnItem.createMany({
         data: preparedReturnLines.map((line) => ({
           shopId,
@@ -449,6 +471,26 @@ export async function createPurchaseReturn(
           ipAddress: meta.ipAddress ?? null,
         },
       });
+
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'PURCHASE',
+        entityId: purchase.id,
+      });
+      for (const productId of uniqueProductIds) {
+        await recordSyncChange(tx, {
+          shopId,
+          entityType: 'PRODUCT',
+          entityId: productId,
+        });
+      }
+      if (purchase.supplierId) {
+        await recordSyncChange(tx, {
+          shopId,
+          entityType: 'SUPPLIER',
+          entityId: purchase.supplierId,
+        });
+      }
 
       const refreshedPurchase = await tx.purchase.findUniqueOrThrow({
         where: { id: purchase.id },

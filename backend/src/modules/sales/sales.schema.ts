@@ -140,7 +140,12 @@ export const cancelSaleSchema = z.strictObject({
   reason: nfcRequiredString(2, 300),
 });
 
+export const receiptPdfQuerySchema = z.strictObject({
+  lang: z.enum(['bn', 'en']).default('bn'),
+});
+
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 export type ListSalesQuery = z.infer<typeof listSalesQuerySchema>;
 export type CreateSaleReturnInput = z.infer<typeof createSaleReturnSchema>;
 export type CancelSaleInput = z.infer<typeof cancelSaleSchema>;
+export type ReceiptPdfQuery = z.infer<typeof receiptPdfQuerySchema>;

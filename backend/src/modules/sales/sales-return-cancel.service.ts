@@ -18,6 +18,11 @@ import { prisma } from '../../database/prisma.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { BusinessRuleError, ConflictError, NotFoundError } from '../../shared/errors/app-error.js';
 import {
+  mapSaleRefundMethodToPaymentMethod,
+  recordCashbookEntry,
+} from '../cashbook/cashbook-ledger.helper.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
+import {
   generateDailyNumber,
   lockInventoryBalancesForUpdate,
   requireIdempotencyKey,
@@ -261,6 +266,23 @@ export async function createSaleReturn(
         },
       });
 
+      const refundCashbookMethod = mapSaleRefundMethodToPaymentMethod(input.refundMethod);
+      if (refundCashbookMethod && cashRefundPoisha > 0) {
+        await recordCashbookEntry(tx, {
+          shopId,
+          direction: 'OUT',
+          entryType: 'SALE_REFUND_OUT',
+          method: refundCashbookMethod,
+          amountPoisha: cashRefundPoisha,
+          referenceType: 'SALE_RETURN',
+          referenceId: saleReturn.id,
+          referenceNumber: returnNumber,
+          note: input.reason ?? sale.receiptNumber,
+          actorUserId,
+          occurredAt: returnedAt,
+        });
+      }
+
       await tx.saleReturnItem.createMany({
         data: preparedReturnLines.map((line) => ({
           shopId,
@@ -391,6 +413,26 @@ export async function createSaleReturn(
           ipAddress: meta.ipAddress ?? null,
         },
       });
+
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'SALE',
+        entityId: sale.id,
+      });
+      for (const productId of uniqueProductIds) {
+        await recordSyncChange(tx, {
+          shopId,
+          entityType: 'PRODUCT',
+          entityId: productId,
+        });
+      }
+      if (sale.customerId) {
+        await recordSyncChange(tx, {
+          shopId,
+          entityType: 'CUSTOMER',
+          entityId: sale.customerId,
+        });
+      }
 
       const refreshedSale = await tx.sale.findUniqueOrThrow({
         where: { id: sale.id },
@@ -599,6 +641,22 @@ export async function cancelSale(
       include: saleInclude,
     });
 
+    for (const payment of sale.payments) {
+      await recordCashbookEntry(tx, {
+        shopId,
+        direction: 'OUT',
+        entryType: 'SALE_CANCEL_OUT',
+        method: payment.method,
+        amountPoisha: payment.amountPoisha,
+        referenceType: 'SALE',
+        referenceId: sale.id,
+        referenceNumber: sale.receiptNumber,
+        note: input.reason,
+        actorUserId,
+        occurredAt: cancelledAt,
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         shopId,
@@ -619,6 +677,26 @@ export async function cancelSale(
         ipAddress: meta.ipAddress ?? null,
       },
     });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'SALE',
+      entityId: sale.id,
+    });
+    for (const productId of uniqueProductIds) {
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'PRODUCT',
+        entityId: productId,
+      });
+    }
+    if (sale.customerId) {
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'CUSTOMER',
+        entityId: sale.customerId,
+      });
+    }
 
     return updated;
   });

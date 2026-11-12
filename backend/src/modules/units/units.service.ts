@@ -3,6 +3,7 @@ import { prisma } from '../../database/prisma.js';
 import type { Unit } from '../../generated/prisma/client.js';
 import { ConflictError, NotFoundError } from '../../shared/errors/app-error.js';
 import { ensureDefaultCatalogForShop } from '../catalog/catalog.seed.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import type { CreateUnitInput, UpdateUnitInput } from './units.schema.js';
 
 interface RequestMeta {
@@ -88,6 +89,12 @@ export async function createUnit(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'UNIT',
+      entityId: unit.id,
+    });
+
     return unit;
   });
 
@@ -134,6 +141,12 @@ export async function updateUnit(
         afterJson: { nameBn: saved.nameBn, nameEn: saved.nameEn },
         ipAddress: meta.ipAddress ?? null,
       },
+    });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'UNIT',
+      entityId: saved.id,
     });
 
     return saved;

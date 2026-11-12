@@ -11,6 +11,8 @@ import { Prisma } from '../../generated/prisma/client.js';
 import { BusinessRuleError, ConflictError, NotFoundError } from '../../shared/errors/app-error.js';
 import { getDhakaDayRangeUtc } from '../../shared/utils/timezone.js';
 import { requireIdempotencyKey, type RequestMeta } from '../../shared/utils/transaction-helpers.js';
+import { recordCashbookEntry } from '../cashbook/cashbook-ledger.helper.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import type {
   CreateSupplierInput,
   CreateSupplierPaymentInput,
@@ -119,6 +121,12 @@ export async function createSupplier(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'SUPPLIER',
+      entityId: supplier.id,
+    });
+
     return supplier;
   });
 
@@ -213,6 +221,12 @@ export async function updateSupplier(
         },
         ipAddress: meta.ipAddress ?? null,
       },
+    });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'SUPPLIER',
+      entityId: supplier.id,
     });
 
     return supplier;
@@ -566,6 +580,20 @@ export async function createSupplierPayment(
         },
       });
 
+      await recordCashbookEntry(tx, {
+        shopId,
+        direction: 'OUT',
+        entryType: 'SUPPLIER_PAYMENT_OUT',
+        method: input.method,
+        amountPoisha: input.amountPoisha,
+        referenceType: 'SUPPLIER_PAYMENT',
+        referenceId: payment.id,
+        referenceNumber: input.reference ?? updatedSupplier.nameBn,
+        note: input.note ?? updatedSupplier.nameBn,
+        actorUserId,
+        occurredAt: paidAt,
+      });
+
       await tx.auditLog.create({
         data: {
           shopId,
@@ -583,6 +611,12 @@ export async function createSupplierPayment(
           },
           ipAddress: meta.ipAddress ?? null,
         },
+      });
+
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'SUPPLIER',
+        entityId: supplierId,
       });
 
       return {

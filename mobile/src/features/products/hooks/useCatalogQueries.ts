@@ -19,6 +19,12 @@ import {
   upsertLocalProduct,
 } from '@/database/repositories/catalog-local.repo';
 import {
+  archiveOfflineProductWithOutbox,
+  createOfflineProductWithOutbox,
+  createOfflineStockAdjustmentWithOutbox,
+  updateOfflineProductWithOutbox,
+} from '@/database/repositories/offline-writes.repo';
+import {
   catalogApi,
   type CreateProductPayload,
   type CreateStockAdjustmentPayload,
@@ -26,6 +32,10 @@ import {
   type UpdateProductPayload,
 } from '@/services/api/catalog';
 import { ApiClientError } from '@/services/api/client';
+import {
+  executeOnlineOrOffline,
+  getOfflineActorContext,
+} from '@/services/sync/offline-mutation-helper';
 import { useAuthStore } from '@/store/auth.store';
 
 export const catalogKeys = {
@@ -207,7 +217,13 @@ export function useValuationQuery(enabled: boolean) {
 export function useCreateProductMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateProductPayload) => catalogApi.createProduct(payload),
+    mutationFn: (payload: CreateProductPayload) =>
+      executeOnlineOrOffline({
+        onlineFn: () => catalogApi.createProduct(payload),
+        offlineFn: async () => ({
+          product: await createOfflineProductWithOutbox(getOfflineActorContext(), payload),
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalProduct(res.product);
       await queryClient.invalidateQueries({ queryKey: catalogKeys.all });
@@ -223,13 +239,24 @@ export function useUpdateProductMutation() {
       id: string;
       patch: UpdateProductPayload;
       units?: ProductUnitInputPayload[];
-    }) => {
-      const updated = await catalogApi.updateProduct(input.id, input.patch);
-      if (input.units) {
-        return catalogApi.replaceProductUnits(input.id, input.units);
-      }
-      return updated;
-    },
+    }) =>
+      executeOnlineOrOffline({
+        onlineFn: async () => {
+          const updated = await catalogApi.updateProduct(input.id, input.patch);
+          if (input.units) {
+            return catalogApi.replaceProductUnits(input.id, input.units);
+          }
+          return updated;
+        },
+        offlineFn: async () => ({
+          product: await updateOfflineProductWithOutbox(
+            getOfflineActorContext(),
+            input.id,
+            input.patch,
+            input.units,
+          ),
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalProduct(res.product);
       await queryClient.invalidateQueries({ queryKey: catalogKeys.all });
@@ -241,7 +268,14 @@ export function useUpdateProductMutation() {
 export function useArchiveProductMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => catalogApi.archiveProduct(id),
+    mutationFn: (id: string) =>
+      executeOnlineOrOffline({
+        onlineFn: () => catalogApi.archiveProduct(id),
+        offlineFn: async () => {
+          await archiveOfflineProductWithOutbox(getOfflineActorContext(), id);
+          return { archived: true as const, id };
+        },
+      }),
     onSuccess: async (res) => {
       await removeLocalProduct(res.id);
       await queryClient.invalidateQueries({ queryKey: catalogKeys.all });
@@ -253,7 +287,35 @@ export function useArchiveProductMutation() {
 export function useCreateAdjustmentMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateStockAdjustmentPayload) => catalogApi.createAdjustment(payload),
+    mutationFn: (payload: CreateStockAdjustmentPayload) =>
+      executeOnlineOrOffline({
+        onlineFn: () => catalogApi.createAdjustment(payload),
+        offlineFn: async () => {
+          const ctx = getOfflineActorContext();
+          const product = await createOfflineStockAdjustmentWithOutbox(ctx, payload);
+          const now = new Date().toISOString();
+          return {
+            adjustment: {
+              id: product.id,
+              shopId: ctx.shopId,
+              productId: product.id,
+              productNameBn: product.nameBn,
+              productNameEn: product.nameEn,
+              adjustmentType: payload.adjustmentType,
+              qtyBase: payload.qtyDisplay ?? payload.countedQtyDisplay ?? '0.0000',
+              deltaQtyBase: '0.0000',
+              unitCostBdt: product.inventory.avgCostPerBaseBdt,
+              lossPoisha: null,
+              reason: payload.reason ?? null,
+              actorUserId: ctx.userId,
+              actorName: ctx.userName,
+              adjustedAt: now,
+            },
+            product,
+            idempotencyReplayed: false,
+          };
+        },
+      }),
     onSuccess: async (res) => {
       await upsertLocalProduct(res.product);
       await queryClient.invalidateQueries({ queryKey: catalogKeys.all });

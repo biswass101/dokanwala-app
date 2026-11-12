@@ -5,12 +5,13 @@ import type {
   DiscountType,
   PaymentMethod,
   RefundMethod,
+  ReportExportLang,
   SaleDto,
   SaleReturnDto,
   SaleStatus,
 } from '@dokanwala/shared';
 import * as Crypto from 'expo-crypto';
-import { unwrapApiGet, unwrapApiPatch, unwrapApiPost } from './client';
+import { apiClient, unwrapApiGet, unwrapApiPatch, unwrapApiPost } from './client';
 
 export interface CreateCustomerPayload {
   id?: string;
@@ -187,5 +188,22 @@ export const salesApi = {
     return unwrapApiPost(`/sales/${saleId}/cancel`, body, {
       'X-Idempotency-Key': key,
     });
+  },
+
+  async downloadReceiptPdf(
+    saleId: string,
+    lang: ReportExportLang,
+  ): Promise<{ bytes: Uint8Array; filename: string }> {
+    const response = await apiClient.get<ArrayBuffer>(`/sales/${saleId}/receipt/pdf`, {
+      params: { lang },
+      responseType: 'arraybuffer',
+    });
+    const disposition = String(response.headers['content-disposition'] ?? '');
+    const match = /filename="([^"]+)"/.exec(disposition);
+    const filename = match?.[1] ?? `receipt-${saleId}.pdf`;
+    return {
+      bytes: new Uint8Array(response.data),
+      filename,
+    };
   },
 };

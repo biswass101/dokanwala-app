@@ -6,6 +6,13 @@ import type {
 } from '@dokanwala/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  createOfflinePurchaseReturnWithOutbox,
+  createOfflinePurchaseWithOutbox,
+  createOfflineSupplierPaymentWithOutbox,
+  createOfflineSupplierWithOutbox,
+  updateOfflineSupplierWithOutbox,
+} from '@/database/repositories/offline-writes.repo';
+import {
   loadLocalPurchaseById,
   loadLocalPurchases,
   loadLocalSupplierLedger,
@@ -26,6 +33,10 @@ import {
   type CreateSupplierPaymentPayload,
   type UpdateSupplierPayload,
 } from '@/services/api/purchases';
+import {
+  executeOnlineOrOffline,
+  getOfflineActorContext,
+} from '@/services/sync/offline-mutation-helper';
 import { useAuthStore } from '@/store/auth.store';
 
 export const purchasesKeys = {
@@ -118,7 +129,13 @@ export function useSupplierLedgerQuery(supplierId: string | undefined) {
 export function useCreateSupplierMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateSupplierPayload) => suppliersApi.create(payload),
+    mutationFn: (payload: CreateSupplierPayload) =>
+      executeOnlineOrOffline({
+        onlineFn: () => suppliersApi.create(payload),
+        offlineFn: async () => ({
+          supplier: await createOfflineSupplierWithOutbox(getOfflineActorContext(), payload),
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalSupplier(res.supplier);
       await queryClient.invalidateQueries({ queryKey: purchasesKeys.suppliersAll });
@@ -129,7 +146,17 @@ export function useCreateSupplierMutation() {
 export function useUpdateSupplierMutation(supplierId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: UpdateSupplierPayload) => suppliersApi.update(supplierId, payload),
+    mutationFn: (payload: UpdateSupplierPayload) =>
+      executeOnlineOrOffline({
+        onlineFn: () => suppliersApi.update(supplierId, payload),
+        offlineFn: async () => ({
+          supplier: await updateOfflineSupplierWithOutbox(
+            getOfflineActorContext(),
+            supplierId,
+            payload,
+          ),
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalSupplier(res.supplier);
       await Promise.all([
@@ -144,13 +171,46 @@ export function useCreateSupplierPaymentMutation(supplierId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { payload: CreateSupplierPaymentPayload; idempotencyKey?: string }) =>
-      suppliersApi.createPayment(supplierId, input.payload, input.idempotencyKey),
+      executeOnlineOrOffline({
+        onlineFn: () =>
+          suppliersApi.createPayment(supplierId, input.payload, input.idempotencyKey),
+        offlineFn: async () => {
+          const ctx = getOfflineActorContext();
+          const supplier = await createOfflineSupplierPaymentWithOutbox(
+            ctx,
+            supplierId,
+            input.payload,
+            input.idempotencyKey,
+          );
+          const now = new Date().toISOString();
+          return {
+            payment: {
+              id: input.payload.id ?? supplier.id,
+              shopId: ctx.shopId,
+              supplierId,
+              purchaseId: input.payload.purchaseId ?? null,
+              method: input.payload.method,
+              amountPoisha: input.payload.amountPoisha,
+              reference: input.payload.reference ?? null,
+              note: input.payload.note ?? null,
+              actorUserId: ctx.userId,
+              actorName: ctx.userName,
+              paidAt: now,
+              createdAt: now,
+            },
+            supplier,
+            idempotencyReplayed: false,
+          };
+        },
+      }),
     onSuccess: async (res) => {
       await upsertLocalSupplier(res.supplier);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: purchasesKeys.suppliersAll }),
         queryClient.invalidateQueries({ queryKey: purchasesKeys.supplierLedger(supplierId) }),
         queryClient.invalidateQueries({ queryKey: purchasesKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
       ]);
     },
   });
@@ -242,7 +302,17 @@ export function useCreatePurchaseMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { payload: CreatePurchasePayload; idempotencyKey?: string }) =>
-      purchasesApi.create(input.payload, input.idempotencyKey),
+      executeOnlineOrOffline({
+        onlineFn: () => purchasesApi.create(input.payload, input.idempotencyKey),
+        offlineFn: async () => ({
+          purchase: await createOfflinePurchaseWithOutbox(
+            getOfflineActorContext(),
+            input.payload,
+            input.idempotencyKey,
+          ),
+          idempotencyReplayed: false,
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalPurchase(res.purchase);
       await Promise.all([
@@ -257,6 +327,8 @@ export function useCreatePurchaseMutation() {
           : []),
         queryClient.invalidateQueries({ queryKey: ['catalog'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
       ]);
     },
   });
@@ -266,7 +338,39 @@ export function useCreatePurchaseReturnMutation(purchaseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { payload: CreatePurchaseReturnPayload; idempotencyKey?: string }) =>
-      purchasesApi.createReturn(purchaseId, input.payload, input.idempotencyKey),
+      executeOnlineOrOffline({
+        onlineFn: () => purchasesApi.createReturn(purchaseId, input.payload, input.idempotencyKey),
+        offlineFn: async () => {
+          const ctx = getOfflineActorContext();
+          const purchase = await createOfflinePurchaseReturnWithOutbox(
+            ctx,
+            purchaseId,
+            input.payload,
+            input.idempotencyKey,
+          );
+          const now = new Date().toISOString();
+          return {
+            purchase,
+            purchaseReturn: {
+              id: purchase.id,
+              purchaseId: purchase.id,
+              returnNumber: 'OFF-PRET',
+              refundMethod: input.payload.refundMethod,
+              subtotalPoisha: 0,
+              discountAdjustmentPoisha: 0,
+              refundTotalPoisha: 0,
+              cashRefundPoisha: 0,
+              payableAdjustedPoisha: 0,
+              reason: input.payload.reason ?? null,
+              actorUserId: ctx.userId,
+              actorName: ctx.userName,
+              returnedAt: now,
+              items: [],
+            },
+            idempotencyReplayed: false,
+          };
+        },
+      }),
     onSuccess: async (res) => {
       await upsertLocalPurchase(res.purchase);
       await Promise.all([
@@ -281,6 +385,8 @@ export function useCreatePurchaseReturnMutation(purchaseId: string) {
           : []),
         queryClient.invalidateQueries({ queryKey: ['catalog'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
       ]);
     },
   });

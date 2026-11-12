@@ -25,6 +25,11 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
   const expenseCategories = new Map<string, Record<string, unknown>>();
   const expenses = new Map<string, Record<string, unknown>>();
   const expenseAuditLogs = new Map<string, Record<string, unknown>>();
+  const cashbookDailyCache = new Map<string, Record<string, unknown>>();
+  const reportsSnapshotCache = new Map<string, Record<string, unknown>>();
+  const syncOutbox = new Map<string, Record<string, unknown>>();
+  const syncState = new Map<string, Record<string, unknown>>();
+  const syncEntityFlags = new Map<string, Record<string, unknown>>();
 
   return {
     async execAsync() {
@@ -421,6 +426,153 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           reason: params[8],
           occurred_at: params[9],
         });
+      } else if (normalized.includes('INTO CASHBOOK_DAILY_CACHE')) {
+        const key = `${String(params[0] ?? '')}:${String(params[1] ?? '')}`;
+        cashbookDailyCache.set(key, {
+          shop_id: params[0],
+          business_date: params[1],
+          summary_json: params[2],
+          cached_at: params[3],
+        });
+      } else if (normalized.includes('INTO REPORTS_SNAPSHOT_CACHE')) {
+        const key = `${String(params[0] ?? '')}:${String(params[1] ?? '')}`;
+        reportsSnapshotCache.set(key, {
+          shop_id: params[0],
+          report_key: params[1],
+          payload_json: params[2],
+          cached_at: params[3],
+        });
+      } else if (normalized.includes('INTO SYNC_OUTBOX')) {
+        syncOutbox.set(String(params[0] ?? ''), {
+          client_op_id: params[0],
+          shop_id: params[1],
+          idempotency_key: params[2],
+          op_type: params[3],
+          entity_type: params[4],
+          entity_id: params[5],
+          depends_on_entity_id: params[6],
+          sequence_no: params[7],
+          base_version: params[8],
+          payload_json: params[9],
+          local_snapshot_json: params[10],
+          status: params[11],
+          retry_count: params[12],
+          next_retry_at_ms: params[13],
+          conflict_kind: params[14],
+          conflict_message: params[15],
+          server_version: params[16],
+          server_snapshot_json: params[17],
+          warnings_json: params[18],
+          occurred_at: params[19],
+          created_at_ms: params[20],
+          updated_at_ms: params[21],
+        });
+      } else if (normalized.includes('INTO SYNC_STATE')) {
+        syncState.set(String(params[0] ?? ''), {
+          shop_id: params[0],
+          last_sync_seq: params[1],
+          last_synced_at: params[2],
+          device_id: params[3],
+        });
+      } else if (normalized.includes('INTO SYNC_ENTITY_FLAGS')) {
+        const key = `${String(params[0] ?? '')}:${String(params[1] ?? '')}:${String(params[2] ?? '')}`;
+        syncEntityFlags.set(key, {
+          shop_id: params[0],
+          entity_type: params[1],
+          entity_id: params[2],
+          pending_count: params[3],
+          has_conflict: params[4],
+          updated_at_ms: params[5],
+        });
+      } else if (normalized.startsWith('UPDATE SYNC_OUTBOX')) {
+        if (normalized.includes("WHERE STATUS = 'IN_FLIGHT'")) {
+          const nowMs = params[0];
+          for (const row of syncOutbox.values()) {
+            if (row.status === 'IN_FLIGHT') {
+              row.status = 'PENDING';
+              row.next_retry_at_ms = 0;
+              row.updated_at_ms = nowMs;
+            }
+          }
+        } else if (normalized.includes("STATUS = 'FAILED_RETRYABLE'") && normalized.includes('SET NEXT_RETRY_AT_MS = 0')) {
+          const updatedAt = params[0];
+          const shopId = String(params[1] ?? '');
+          for (const row of syncOutbox.values()) {
+            if (row.shop_id === shopId && row.status === 'FAILED_RETRYABLE') {
+              row.next_retry_at_ms = 0;
+              row.updated_at_ms = updatedAt;
+            }
+          }
+        } else if (normalized.includes("SET STATUS = 'IN_FLIGHT'")) {
+          const row = syncOutbox.get(String(params[2] ?? ''));
+          if (row && row.shop_id === params[1]) {
+            row.status = 'IN_FLIGHT';
+            row.updated_at_ms = params[0];
+          }
+        } else if (normalized.includes("SET STATUS = 'SYNCED'")) {
+          const row = syncOutbox.get(String(params[3] ?? ''));
+          if (row && row.shop_id === params[2]) {
+            row.status = 'SYNCED';
+            row.conflict_kind = null;
+            row.conflict_message = null;
+            row.server_version = null;
+            row.server_snapshot_json = null;
+            row.warnings_json = params[0];
+            row.updated_at_ms = params[1];
+          }
+        } else if (normalized.includes("SET STATUS = 'FAILED_RETRYABLE'")) {
+          const row = syncOutbox.get(String(params[5] ?? ''));
+          if (row && row.shop_id === params[4]) {
+            row.status = 'FAILED_RETRYABLE';
+            row.retry_count = params[0];
+            row.next_retry_at_ms = params[1];
+            row.conflict_message = params[2];
+            row.updated_at_ms = params[3];
+          }
+        } else if (normalized.includes('SET IDEMPOTENCY_KEY = ?')) {
+          const row = syncOutbox.get(String(params[5] ?? ''));
+          if (row && row.shop_id === params[4]) {
+            row.idempotency_key = params[0];
+            row.base_version = params[1];
+            row.payload_json = params[2];
+            row.status = 'PENDING';
+            row.retry_count = 0;
+            row.next_retry_at_ms = 0;
+            row.conflict_kind = null;
+            row.conflict_message = null;
+            row.server_version = null;
+            row.server_snapshot_json = null;
+            row.updated_at_ms = params[3];
+          }
+        } else if (normalized.includes('SET STATUS = ?')) {
+          const row = syncOutbox.get(String(params[7] ?? ''));
+          if (row && row.shop_id === params[6]) {
+            row.status = params[0];
+            row.conflict_kind = params[1];
+            row.conflict_message = params[2];
+            row.server_version = params[3];
+            row.server_snapshot_json = params[4];
+            row.updated_at_ms = params[5];
+          }
+        }
+      } else if (normalized.startsWith('DELETE FROM SYNC_OUTBOX')) {
+        if (normalized.includes('WHERE SHOP_ID = ? AND CLIENT_OP_ID = ?')) {
+          const row = syncOutbox.get(String(params[1] ?? ''));
+          if (row && row.shop_id === params[0]) {
+            syncOutbox.delete(String(params[1] ?? ''));
+          }
+        } else {
+          syncOutbox.clear();
+        }
+      } else if (normalized.startsWith('DELETE FROM SYNC_STATE')) {
+        syncState.clear();
+      } else if (normalized.startsWith('DELETE FROM SYNC_ENTITY_FLAGS')) {
+        if (normalized.includes('WHERE SHOP_ID = ? AND ENTITY_TYPE = ? AND ENTITY_ID = ?')) {
+          const key = `${String(params[0] ?? '')}:${String(params[1] ?? '')}:${String(params[2] ?? '')}`;
+          syncEntityFlags.delete(key);
+        } else {
+          syncEntityFlags.clear();
+        }
       } else if (normalized.startsWith('DELETE FROM SHOPS_LOCAL')) {
         shops.clear();
       } else if (normalized.startsWith('DELETE FROM USERS_LOCAL')) {
@@ -580,6 +732,10 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
         } else {
           expenseAuditLogs.clear();
         }
+      } else if (normalized.startsWith('DELETE FROM CASHBOOK_DAILY_CACHE')) {
+        cashbookDailyCache.clear();
+      } else if (normalized.startsWith('DELETE FROM REPORTS_SNAPSHOT_CACHE')) {
+        reportsSnapshotCache.clear();
       }
       return { changes: 1, lastInsertRowId: 1 };
     },
@@ -638,6 +794,38 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           return (expenses.get(String(params[0] ?? '')) as T | undefined) ?? null;
         }
         return (expenses.values().next().value as T | undefined) ?? null;
+      }
+      if (normalized.includes('FROM CASHBOOK_DAILY_CACHE')) {
+        const key = `${String(params[0] ?? '')}:${String(params[1] ?? '')}`;
+        return (cashbookDailyCache.get(key) as T | undefined) ?? null;
+      }
+      if (normalized.includes('FROM REPORTS_SNAPSHOT_CACHE')) {
+        const key = `${String(params[0] ?? '')}:${String(params[1] ?? '')}`;
+        return (reportsSnapshotCache.get(key) as T | undefined) ?? null;
+      }
+      if (normalized.includes('FROM SYNC_OUTBOX')) {
+        if (normalized.includes('COALESCE(MAX(SEQUENCE_NO), 0)')) {
+          let maxSeq = 0;
+          for (const row of syncOutbox.values()) {
+            const seq = Number(row.sequence_no ?? 0);
+            if (seq > maxSeq) maxSeq = seq;
+          }
+          return { max_seq: maxSeq } as T;
+        }
+        if (normalized.includes('WHERE SHOP_ID = ? AND CLIENT_OP_ID = ?')) {
+          const row = syncOutbox.get(String(params[1] ?? ''));
+          if (row && row.shop_id === params[0]) {
+            return row as T;
+          }
+          return null;
+        }
+      }
+      if (normalized.includes('FROM SYNC_STATE')) {
+        return (syncState.get(String(params[0] ?? '')) as T | undefined) ?? null;
+      }
+      if (normalized.includes('FROM SYNC_ENTITY_FLAGS')) {
+        const key = `${String(params[0] ?? '')}:${String(params[1] ?? '')}:${String(params[2] ?? '')}`;
+        return (syncEntityFlags.get(key) as T | undefined) ?? null;
       }
       return null;
     },
@@ -813,6 +1001,23 @@ function createInMemoryWebFallback(): SqliteDatabaseAdapter {
           return Array.from(expenseAuditLogs.values()).filter((r) => r.expense_id === expId) as T[];
         }
         return Array.from(expenseAuditLogs.values()) as T[];
+      }
+      if (normalized.includes('FROM SYNC_OUTBOX')) {
+        if (normalized.includes("WHERE STATUS = 'IN_FLIGHT'")) {
+          return Array.from(syncOutbox.values()).filter((r) => r.status === 'IN_FLIGHT') as T[];
+        }
+        if (normalized.includes('WHERE SHOP_ID = ? AND ENTITY_TYPE = ? AND ENTITY_ID = ?')) {
+          return Array.from(syncOutbox.values()).filter(
+            (r) =>
+              r.shop_id === params[0] && r.entity_type === params[1] && r.entity_id === params[2],
+          ) as T[];
+        }
+        if (normalized.includes('WHERE SHOP_ID = ?')) {
+          return Array.from(syncOutbox.values())
+            .filter((r) => r.shop_id === params[0])
+            .sort((a, b) => Number(a.sequence_no ?? 0) - Number(b.sequence_no ?? 0)) as T[];
+        }
+        return Array.from(syncOutbox.values()) as T[];
       }
       return [] as T[];
     },

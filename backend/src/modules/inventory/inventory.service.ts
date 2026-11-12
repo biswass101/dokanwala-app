@@ -28,6 +28,7 @@ import {
 import { getDhakaDayRangeUtc } from '../../shared/utils/timezone.js';
 import { listProducts } from '../products/products.service.js';
 import { productInclude, toProductDto } from '../products/products.types.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import type {
   CreateStockAdjustmentInput,
   ListAdjustmentsQuery,
@@ -492,6 +493,12 @@ export async function createStockAdjustment(
     const updatedProduct = await tx.product.findUniqueOrThrow({
       where: { id: product.id },
       include: productInclude,
+    });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'PRODUCT',
+      entityId: product.id,
     });
 
     return {

@@ -1,12 +1,17 @@
+import { router } from 'expo-router';
 import React from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { useFormattedMoney } from '@/hooks/useFormattedMoney';
 import { usePreferencesStore } from '@/store/preferences.store';
 import { Colors } from '@/theme/tokens';
 import { AppText } from '../ui/AppText';
 
-export function SyncStatusPill() {
+export interface SyncStatusPillProps {
+  onPress?: () => void;
+}
+
+export function SyncStatusPill({ onPress }: SyncStatusPillProps = {}) {
   const { t } = useAppTranslation();
   const { formatDigits } = useFormattedMoney();
   const syncIndicator = usePreferencesStore((state) => state.syncIndicator);
@@ -42,8 +47,11 @@ export function SyncStatusPill() {
   }[syncIndicator];
 
   return (
-    <View
-      style={{
+    <Pressable
+      accessibilityRole="button"
+      testID="sync-status-pill"
+      onPress={onPress ?? (() => router?.push('/sync'))}
+      style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: config.bg,
@@ -51,7 +59,8 @@ export function SyncStatusPill() {
         paddingVertical: 5,
         borderRadius: 999,
         gap: 6,
-      }}
+        opacity: pressed ? 0.78 : 1,
+      })}
     >
       <View
         style={{
@@ -64,6 +73,6 @@ export function SyncStatusPill() {
       <AppText variant="caption" weight="semibold" color={config.text}>
         {config.label}
       </AppText>
-    </View>
+    </Pressable>
   );
 }

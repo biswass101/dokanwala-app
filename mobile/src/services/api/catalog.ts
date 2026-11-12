@@ -24,6 +24,7 @@ export interface ProductUnitInputPayload {
 }
 
 export interface CreateProductPayload {
+  id?: string;
   nameBn: string;
   nameEn?: string | null;
   categoryId?: string | null;

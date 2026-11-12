@@ -11,6 +11,8 @@ import { Decimal } from 'decimal.js';
 import { prisma } from '../../database/prisma.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { BusinessRuleError, NotFoundError } from '../../shared/errors/app-error.js';
+import { recordCashbookEntry } from '../cashbook/cashbook-ledger.helper.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import {
   generateDailyNumber,
   InvalidUnitConversionError,
@@ -248,6 +250,22 @@ export async function createPurchase(
         },
       });
 
+      if (input.paidPoisha > 0 && input.paymentMethod) {
+        await recordCashbookEntry(tx, {
+          shopId,
+          direction: 'OUT',
+          entryType: 'PURCHASE_OUT',
+          method: input.paymentMethod,
+          amountPoisha: input.paidPoisha,
+          referenceType: 'PURCHASE',
+          referenceId: purchase.id,
+          referenceNumber: purchaseNumber,
+          note: supplierNameSnapshot ?? input.note ?? null,
+          actorUserId,
+          occurredAt: purchasedAt,
+        });
+      }
+
       await tx.purchaseItem.createMany({
         data: preparedLines.map((line) => ({
           shopId,
@@ -361,6 +379,26 @@ export async function createPurchase(
           ipAddress: meta.ipAddress ?? null,
         },
       });
+
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'PURCHASE',
+        entityId: purchase.id,
+      });
+      for (const productId of uniqueProductIds) {
+        await recordSyncChange(tx, {
+          shopId,
+          entityType: 'PRODUCT',
+          entityId: productId,
+        });
+      }
+      if (input.supplierId) {
+        await recordSyncChange(tx, {
+          shopId,
+          entityType: 'SUPPLIER',
+          entityId: input.supplierId,
+        });
+      }
 
       return tx.purchase.findUniqueOrThrow({
         where: { id: purchase.id },

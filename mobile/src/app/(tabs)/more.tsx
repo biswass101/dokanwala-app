@@ -114,6 +114,13 @@ export default function MoreScreen() {
               fullWidth
               onPress={() => router.push('/suppliers')}
             />
+            <Button
+              label={t('more.backupRestore')}
+              variant="outline"
+              fullWidth
+              testID="more-backup-btn"
+              onPress={() => router.push('/backup')}
+            />
           </>
         ) : null}
 
@@ -139,6 +146,13 @@ export default function MoreScreen() {
         />
 
         <Button
+          label={t('more.cashbook')}
+          variant="outline"
+          fullWidth
+          onPress={() => router.push('/cashbook')}
+        />
+
+        <Button
           label={t('more.newExpense')}
           variant="outline"
           fullWidth
@@ -150,6 +164,14 @@ export default function MoreScreen() {
           variant="secondary"
           fullWidth
           onPress={() => router.push('/(auth)/setup-pin')}
+        />
+
+        <Button
+          label={t('more.syncCenter')}
+          variant="outline"
+          fullWidth
+          testID="more-sync-center-btn"
+          onPress={() => router.push('/sync')}
         />
 
         {hasOfflinePin ? (

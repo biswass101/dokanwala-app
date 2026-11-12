@@ -17,6 +17,8 @@ import {
 } from '../../shared/errors/app-error.js';
 import { getDhakaDayRangeUtc } from '../../shared/utils/timezone.js';
 import { requireIdempotencyKey, type RequestMeta } from '../../shared/utils/transaction-helpers.js';
+import { recordCashbookEntry } from '../cashbook/cashbook-ledger.helper.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import type {
   CreateCustomerInput,
   CreateCustomerPaymentInput,
@@ -140,6 +142,12 @@ export async function createCustomer(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'CUSTOMER',
+      entityId: customer.id,
+    });
+
     return customer;
   });
 
@@ -234,6 +242,12 @@ export async function updateCustomer(
         },
         ipAddress: meta.ipAddress ?? null,
       },
+    });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'CUSTOMER',
+      entityId: customer.id,
     });
 
     return customer;
@@ -629,6 +643,20 @@ export async function collectCustomerPayment(
         },
       });
 
+      await recordCashbookEntry(tx, {
+        shopId,
+        direction: 'IN',
+        entryType: 'DUE_COLLECTION_IN',
+        method: input.method,
+        amountPoisha: input.amountPoisha,
+        referenceType: 'CUSTOMER_PAYMENT',
+        referenceId: payment.id,
+        referenceNumber: input.reference ?? updatedCustomer.nameBn,
+        note: input.note ?? updatedCustomer.nameBn,
+        actorUserId,
+        occurredAt: paidAt,
+      });
+
       await tx.auditLog.create({
         data: {
           shopId,
@@ -646,6 +674,12 @@ export async function collectCustomerPayment(
           },
           ipAddress: meta.ipAddress ?? null,
         },
+      });
+
+      await recordSyncChange(tx, {
+        shopId,
+        entityType: 'CUSTOMER',
+        entityId: customerId,
       });
 
       return {

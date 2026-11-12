@@ -3,6 +3,7 @@ import { prisma } from '../../database/prisma.js';
 import type { Category } from '../../generated/prisma/client.js';
 import { ConflictError, NotFoundError } from '../../shared/errors/app-error.js';
 import { ensureDefaultCatalogForShop } from '../catalog/catalog.seed.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import type { CreateCategoryInput, UpdateCategoryInput } from './categories.schema.js';
 
 interface RequestMeta {
@@ -90,6 +91,12 @@ export async function createCategory(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'CATEGORY',
+      entityId: category.id,
+    });
+
     return category;
   });
 
@@ -159,6 +166,12 @@ export async function updateCategory(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'CATEGORY',
+      entityId: saved.id,
+    });
+
     return saved;
   });
 
@@ -213,6 +226,13 @@ export async function archiveCategory(
         beforeJson: { nameBn: existing.nameBn },
         ipAddress: meta.ipAddress ?? null,
       },
+    });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'CATEGORY',
+      entityId: existing.id,
+      action: 'DELETE',
     });
   });
 

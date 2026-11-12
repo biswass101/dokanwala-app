@@ -16,6 +16,11 @@ import {
   upsertLocalExpense,
   upsertLocalExpenseCategory,
 } from '@/database/repositories/customers-expenses-local.repo';
+import {
+  createOfflineExpenseCategoryWithOutbox,
+  createOfflineExpenseWithOutbox,
+  updateOfflineExpenseWithOutbox,
+} from '@/database/repositories/offline-writes.repo';
 import { ApiClientError } from '@/services/api/client';
 import {
   expenseCategoriesApi,
@@ -24,6 +29,10 @@ import {
   type CreateExpensePayload,
   type UpdateExpensePayload,
 } from '@/services/api/expenses';
+import {
+  executeOnlineOrOffline,
+  getOfflineActorContext,
+} from '@/services/sync/offline-mutation-helper';
 import { useAuthStore } from '@/store/auth.store';
 
 export const expensesKeys = {
@@ -69,7 +78,16 @@ export function useExpenseCategoriesQuery() {
 export function useCreateExpenseCategoryMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateExpenseCategoryPayload) => expenseCategoriesApi.create(payload),
+    mutationFn: (payload: CreateExpenseCategoryPayload) =>
+      executeOnlineOrOffline({
+        onlineFn: () => expenseCategoriesApi.create(payload),
+        offlineFn: async () => ({
+          category: await createOfflineExpenseCategoryWithOutbox(
+            getOfflineActorContext(),
+            payload,
+          ),
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalExpenseCategory(res.category);
       await queryClient.invalidateQueries({ queryKey: expensesKeys.categoriesAll });
@@ -205,10 +223,24 @@ export function useCreateExpenseMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { payload: CreateExpensePayload; idempotencyKey?: string }) =>
-      expensesApi.create(input.payload, input.idempotencyKey),
+      executeOnlineOrOffline({
+        onlineFn: () => expensesApi.create(input.payload, input.idempotencyKey),
+        offlineFn: async () => ({
+          expense: await createOfflineExpenseWithOutbox(
+            getOfflineActorContext(),
+            input.payload,
+            input.idempotencyKey,
+          ),
+          idempotencyReplayed: false,
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalExpense(res.expense);
-      await queryClient.invalidateQueries({ queryKey: expensesKeys.all });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: expensesKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
+      ]);
     },
   });
 }
@@ -216,13 +248,25 @@ export function useCreateExpenseMutation() {
 export function useUpdateExpenseMutation(expenseId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: UpdateExpensePayload) => expensesApi.update(expenseId, payload),
+    mutationFn: (payload: UpdateExpensePayload) =>
+      executeOnlineOrOffline({
+        onlineFn: () => expensesApi.update(expenseId, payload),
+        offlineFn: async () => ({
+          expense: await updateOfflineExpenseWithOutbox(
+            getOfflineActorContext(),
+            expenseId,
+            payload,
+          ),
+        }),
+      }),
     onSuccess: async (res) => {
       await upsertLocalExpense(res.expense);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: expensesKeys.all }),
         queryClient.invalidateQueries({ queryKey: expensesKeys.detail(expenseId) }),
         queryClient.invalidateQueries({ queryKey: expensesKeys.history(expenseId) }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
       ]);
     },
   });

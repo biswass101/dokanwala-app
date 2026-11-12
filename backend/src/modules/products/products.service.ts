@@ -17,6 +17,7 @@ import {
   NotFoundError,
 } from '../../shared/errors/app-error.js';
 import { ensureDefaultCatalogForShop } from '../catalog/catalog.seed.js';
+import { recordSyncChange } from '../sync/sync-change.helper.js';
 import type {
   CreateProductInput,
   ListProductsQuery,
@@ -413,6 +414,12 @@ export async function createProduct(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'PRODUCT',
+      entityId: product.id,
+    });
+
     return tx.product.findUniqueOrThrow({
       where: { id: product.id },
       include: productInclude,
@@ -593,6 +600,12 @@ export async function updateProduct(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'PRODUCT',
+      entityId: existing.id,
+    });
+
     return tx.product.findUniqueOrThrow({
       where: { id: existing.id },
       include: productInclude,
@@ -690,6 +703,12 @@ export async function replaceProductUnits(
       },
     });
 
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'PRODUCT',
+      entityId: existing.id,
+    });
+
     return tx.product.findUniqueOrThrow({
       where: { id: existing.id },
       include: productInclude,
@@ -738,6 +757,13 @@ export async function archiveProduct(
         beforeJson: { nameBn: existing.nameBn },
         ipAddress: meta.ipAddress ?? null,
       },
+    });
+
+    await recordSyncChange(tx, {
+      shopId,
+      entityType: 'PRODUCT',
+      entityId: existing.id,
+      action: 'DELETE',
     });
   });
 
