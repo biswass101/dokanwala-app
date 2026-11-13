@@ -6,6 +6,7 @@ RUN apk add --no-cache openssl libc6-compat
 # 1. Builder stage
 FROM base AS builder
 WORKDIR /app
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
 # Copy package manifests for caching
 COPY package*.json ./
