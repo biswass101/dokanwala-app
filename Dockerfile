@@ -45,6 +45,7 @@ COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/backend/dist ./backend/dist
 COPY --from=builder /app/backend/src/generated ./backend/src/generated
 COPY --from=builder /app/backend/prisma ./backend/prisma
+COPY --from=builder /app/backend/prisma.config.ts ./backend/prisma.config.ts
 COPY --from=builder /app/backend/assets ./backend/assets
 
 ENV PATH="/app/node_modules/.bin:$PATH"
