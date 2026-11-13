@@ -1,0 +1,14 @@
+node_modules
+.git
+.github
+mobile
+backend/dist
+packages/shared/dist
+*.log
+.env
+.env.*
+!backend/.env.example
+!mobile/.env.example
+coverage
+.expo
+

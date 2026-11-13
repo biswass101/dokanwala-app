@@ -3,14 +3,17 @@ import {
   bdtToPoisha,
   compareQuantities,
   doesDiscountExceedPercentCap,
+  formatDhakaDate,
+  getDhakaYmd,
   poishaToBdtString,
+  shiftDhakaYmd,
   toBanglaDigits,
   type DigitStyle,
   type PaymentMethod,
 } from '@dokanwala/shared';
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
-import { AppText, Button, Card, Input, NumericInput } from '@/components';
+import { AppText, Badge, Button, Card, Input, NumericInput } from '@/components';
 import { FilterChip } from '@/features/products/components/FilterChip';
 import { useCreateSaleMutation } from '@/features/sales/hooks/useSalesQueries';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
@@ -97,6 +100,11 @@ function CheckoutModalContent({ onClose, onCompleted }: Omit<CheckoutModalProps,
   const [tenderedAscii, setTenderedAscii] = useState('');
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const todayYmd = getDhakaYmd();
+  const [saleDate, setSaleDate] = useState<string>(todayYmd);
+  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+  const [customDateInput, setCustomDateInput] = useState<string>(todayYmd);
 
   const paymentComputation = useMemo(() => {
     let paidPoisha = 0;
@@ -286,6 +294,7 @@ function CheckoutModalContent({ onClose, onCompleted }: Omit<CheckoutModalProps,
             ? { tenderedPoisha: paymentComputation.tenderedPoisha }
             : {}),
           ...(note.trim().length > 0 ? { note: note.trim() } : {}),
+          ...(saleDate && saleDate !== todayYmd ? { soldAt: `${saleDate}T12:00:00+06:00` } : {}),
         },
       });
       clearCart();
@@ -396,6 +405,85 @@ function CheckoutModalContent({ onClose, onCompleted }: Omit<CheckoutModalProps,
                 {formatMoney(summary.totalPoisha)}
               </AppText>
             </View>
+          </Card>
+
+          {/* Sale Date Selector */}
+          <Card style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <AppText variant="caption" weight="semibold" color={Colors.textSecondary}>
+                {t('pos.saleDateLabel', { defaultValue: 'বিক্রির তারিখ' })}
+              </AppText>
+              {saleDate === todayYmd ? (
+                <Badge label={t('home.todayBadge', { defaultValue: 'আজ' })} tone="primary" />
+              ) : (
+                <Badge label={t('common.customDate', { defaultValue: 'কাস্টম তারিখ' })} tone="warning" />
+              )}
+            </View>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <AppText variant="body" weight="bold">
+                {formatDhakaDate(`${saleDate}T12:00:00+06:00`, language, digitStyle)}
+              </AppText>
+              <Button
+                label={showDatePicker ? t('common.done', { defaultValue: 'সম্পন্ন' }) : t('common.change', { defaultValue: 'তারিখ পরিবর্তন' })}
+                variant="outline"
+                onPress={() => setShowDatePicker(!showDatePicker)}
+              />
+            </View>
+
+            {showDatePicker ? (
+              <View style={{ gap: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: Colors.border }}>
+                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                  <FilterChip
+                    label={t('common.today', { defaultValue: 'আজ' })}
+                    selected={saleDate === todayYmd}
+                    onPress={() => {
+                      setSaleDate(todayYmd);
+                      setCustomDateInput(todayYmd);
+                    }}
+                  />
+                  <FilterChip
+                    label={t('common.yesterday', { defaultValue: 'গতকাল' })}
+                    selected={saleDate === shiftDhakaYmd(todayYmd, -1)}
+                    onPress={() => {
+                      const y = shiftDhakaYmd(todayYmd, -1);
+                      setSaleDate(y);
+                      setCustomDateInput(y);
+                    }}
+                  />
+                  <FilterChip
+                    label={t('common.twoDaysAgo', { defaultValue: '২ দিন আগে' })}
+                    selected={saleDate === shiftDhakaYmd(todayYmd, -2)}
+                    onPress={() => {
+                      const d = shiftDhakaYmd(todayYmd, -2);
+                      setSaleDate(d);
+                      setCustomDateInput(d);
+                    }}
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      placeholder="YYYY-MM-DD"
+                      value={customDateInput}
+                      onChangeText={setCustomDateInput}
+                    />
+                  </View>
+                  <Button
+                    label={t('common.apply', { defaultValue: 'সেট করুন' })}
+                    onPress={() => {
+                      if (/^\d{4}-\d{2}-\d{2}$/.test(customDateInput)) {
+                        setSaleDate(customDateInput);
+                        setShowDatePicker(false);
+                      } else {
+                        setFormError('তারিখটি সঠিক নয় (YYYY-MM-DD)');
+                      }
+                    }}
+                  />
+                </View>
+              </View>
+            ) : null}
           </Card>
 
           {/* Customer Selector */}

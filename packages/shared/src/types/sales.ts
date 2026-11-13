@@ -152,3 +152,23 @@ export interface SaleDto {
   payments: PaymentDto[];
   returns: SaleReturnDto[];
 }
+
+export interface UpdateSaleDto {
+  soldAt?: string;
+  note?: string | null;
+  customerId?: string | null;
+}
+
+export interface CreateQuickSaleDto {
+  id?: string;
+  totalSellingPricePoisha: number;
+  quantity?: number | string;
+  note?: string | null;
+  soldAt?: string;
+  paymentMethod?: PaymentMethod;
+  paidPoisha?: number;
+  customerId?: string | null;
+  productId?: string | null;
+  unitId?: string | null;
+}
+

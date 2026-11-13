@@ -43,6 +43,8 @@ export const saleLineItemInputSchema = z.strictObject({
     decimals: 4,
     label: 'Sale quantity',
   }),
+  unitPricePoisha: positivePoishaSchema.optional(),
+  lineTotalPoisha: positivePoishaSchema.optional(),
 });
 
 export const salePaymentInputSchema = z.strictObject({
@@ -61,6 +63,12 @@ export const createSaleSchema = z
     payments: z.array(salePaymentInputSchema).max(20).optional().default([]),
     tenderedPoisha: nonNegativePoishaSchema.nullable().optional(),
     note: nfcOptionalString(300),
+    soldAt: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid soldAt date format' })
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (data.discountType === 'PERCENT') {
@@ -140,11 +148,68 @@ export const cancelSaleSchema = z.strictObject({
   reason: nfcRequiredString(2, 300),
 });
 
+export const updateSaleSchema = z.strictObject({
+  soldAt: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid soldAt date format' })
+    .optional(),
+  note: nfcOptionalString(300),
+  customerId: z.uuid('Invalid customer identifier').nullable().optional(),
+});
+
+export const deleteSaleSchema = z.strictObject({
+  reason: nfcOptionalString(300),
+});
+
+export const createQuickSaleSchema = z.strictObject({
+  id: z.uuid().optional(),
+  customerId: z.uuid('Invalid customer identifier').nullable().optional(),
+  productId: z.uuid('Invalid product identifier').optional(),
+  unitId: z.uuid('Invalid unit identifier').optional(),
+  quantity: z
+    .union([z.string(), z.number()])
+    .transform((raw, ctx) => {
+      const str = typeof raw === 'number' ? String(raw) : normalizeNumericInput(raw);
+      if (!str || !/^\d+(?:\.\d+)?$/.test(str)) {
+        ctx.addIssue({ code: 'custom', message: 'Quantity must be a valid positive number' });
+        return z.NEVER;
+      }
+      try {
+        const dec = new Decimal(str);
+        if (!dec.isFinite() || dec.lte(0)) {
+          ctx.addIssue({ code: 'custom', message: 'Quantity must be greater than zero' });
+          return z.NEVER;
+        }
+        return dec.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed(4);
+      } catch {
+        ctx.addIssue({ code: 'custom', message: 'Quantity is invalid' });
+        return z.NEVER;
+      }
+    })
+    .optional()
+    .default('1.0000'),
+  totalSellingPricePoisha: positivePoishaSchema,
+  paidPoisha: nonNegativePoishaSchema.optional(),
+  paymentMethod: z.enum(['CASH', 'BKASH', 'NAGAD', 'OTHER']).optional().default('CASH'),
+  note: nfcOptionalString(300),
+  soldAt: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid soldAt date format' })
+    .optional(),
+});
+
 export const receiptPdfQuerySchema = z.strictObject({
   lang: z.enum(['bn', 'en']).default('bn'),
 });
 
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
+export type CreateQuickSaleInput = z.infer<typeof createQuickSaleSchema>;
+export type UpdateSaleInput = z.infer<typeof updateSaleSchema>;
+export type DeleteSaleInput = z.infer<typeof deleteSaleSchema>;
 export type ListSalesQuery = z.infer<typeof listSalesQuerySchema>;
 export type CreateSaleReturnInput = z.infer<typeof createSaleReturnSchema>;
 export type CancelSaleInput = z.infer<typeof cancelSaleSchema>;

@@ -118,6 +118,47 @@ export interface RecentDashboardTransactionDto {
   referenceId: string;
 }
 
+export type DashboardPeriod = 'day' | 'week' | 'month';
+
+export interface DashboardComparisonItemDto {
+  currentPoisha: number;
+  previousPoisha: number;
+  diffPoisha: number;
+  growthPercent: number | null;
+}
+
+export interface DashboardComparisonMetricsDto {
+  sales: DashboardComparisonItemDto;
+  salesCount: {
+    current: number;
+    previous: number;
+    diff: number;
+    growthPercent: number | null;
+  };
+  expenses: DashboardComparisonItemDto;
+  grossProfit: DashboardComparisonItemDto | null;
+  netProfit: DashboardComparisonItemDto | null;
+  cashReceived: DashboardComparisonItemDto;
+  creditGiven: DashboardComparisonItemDto;
+}
+
+export interface DashboardChartPointDto {
+  key: string;
+  label: string;
+  currentPoisha: number;
+  previousPoisha: number;
+  currentCount: number;
+  previousCount: number;
+}
+
+export interface DashboardPaymentDistributionDto {
+  cashPoisha: number;
+  bkashPoisha: number;
+  nagadPoisha: number;
+  otherPoisha: number;
+  creditPoisha: number;
+}
+
 export interface DashboardSummaryResponse {
   businessDate: string;
   todaySalesPoisha: number;
@@ -139,6 +180,14 @@ export interface DashboardSummaryResponse {
   cashbookStatus: CashbookSessionStatus | 'UNOPENED';
   cashbookExpectedCashPoisha: number;
   recentTransactions: RecentDashboardTransactionDto[];
+  period?: DashboardPeriod;
+  periodLabel?: string;
+  comparisonLabel?: string;
+  fromDate?: string;
+  toDate?: string;
+  comparison?: DashboardComparisonMetricsDto;
+  chartSeries?: DashboardChartPointDto[];
+  paymentDistribution?: DashboardPaymentDistributionDto;
 }
 
 export type SalesReportPeriod = 'daily' | 'weekly' | 'monthly';

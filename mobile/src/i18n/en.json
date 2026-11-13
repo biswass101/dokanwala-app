@@ -25,7 +25,20 @@
     "errorFallback": "An unexpected issue occurred. Please try again.",
     "phaseBadge": "Scheduled in upcoming phase",
     "savedSuccess": "Saved successfully",
-    "offlineCachedBadge": "Showing offline cached data"
+    "offlineCachedBadge": "Showing offline cached data",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "twoDaysAgo": "2 Days Ago",
+    "last7Days": "Last 7 Days",
+    "thisMonth": "This Month",
+    "prevDay": "Previous Day",
+    "nextDay": "Next Day",
+    "customDate": "Custom Date",
+    "customRange": "Custom Range",
+    "done": "Done",
+    "change": "Change Date",
+    "apply": "Apply",
+    "edit": "Edit"
   },
   "roles": {
     "OWNER": "Owner",
@@ -238,12 +251,31 @@
     "txKindCustomerPayment": "Due Collected",
     "txKindSupplierPayment": "Supplier Paid",
     "actions": {
+      "quickSale": "⚡ Quick Sale",
       "newSale": "New Sale",
       "addProduct": "Add Product",
       "purchase": "Purchase Stock",
       "expense": "Add Expense",
       "collectDue": "Collect Due"
-    }
+    },
+    "periodDay": "Day / Specific Date",
+    "periodWeek": "Week",
+    "periodMonth": "Month",
+    "weekSummaryTitle": "This Week's Summary",
+    "monthSummaryTitle": "This Month's Summary",
+    "summarySuffix": "Summary",
+    "weekSalesLabel": "Weekly Net Sales",
+    "monthSalesLabel": "Monthly Net Sales",
+    "weekExpensesLabel": "Weekly Expenses",
+    "monthExpensesLabel": "Monthly Expenses",
+    "periodGrossProfitLabel": "Gross Profit",
+    "periodNetProfitLabel": "Net Profit (Profit - Expenses)",
+    "salesComparisonChartTitle": "Sales Comparison & Trend",
+    "chartSubtitle": "Current vs Previous Period Comparison Chart",
+    "paymentBreakdownTitle": "Payment Method Distribution",
+    "totalRecorded": "Total",
+    "todayBadge": "Today",
+    "goToToday": "Return to Today"
   },
   "products": {
     "title": "Products & Inventory",
@@ -398,6 +430,14 @@
   },
   "pos": {
     "title": "New Sale (POS)",
+    "quickSaleTitle": "Quick Sale",
+    "modes": {
+      "catalog": "Catalog POS",
+      "quick": "⚡ Direct / Quick Sale"
+    },
+    "amountRequired": "Please enter sale amount",
+    "qtyRequired": "Quantity must be at least 1",
+    "customerRequiredForDue": "Customer selection is required for credit sale",
     "historyButton": "Sales History",
     "frequentItemsTitle": "Frequent / Quick Items",
     "searchPlaceholder": "Search product (e.g. Pan, Supari, Jorda)...",
@@ -428,7 +468,8 @@
     "notePlaceholder": "e.g. Urgent delivery or special note",
     "checkoutButton": "Checkout ({{total}})",
     "checkoutModalTitle": "Payment & Checkout",
-    "completeSaleButton": "Complete Sale"
+    "completeSaleButton": "Complete Sale",
+    "saleDateLabel": "Sale Date"
   },
   "sales": {
     "historyTitle": "Sales History & Receipts",
@@ -440,7 +481,8 @@
       "PARTIALLY_RETURNED": "Part. Returned",
       "RETURNED": "Returned",
       "DUE_ONLY": "Has Due",
-      "CANCELLED": "Cancelled"
+      "CANCELLED": "Cancelled",
+      "ALL_DATES": "All Dates"
     },
     "statuses": {
       "COMPLETED": "Completed",
@@ -508,7 +550,15 @@
     "cancelReasonInputLabel": "Cancellation Reason *",
     "cancelReasonInputPlaceholder": "e.g. Entered wrong items",
     "emptyHistoryTitle": "No sales receipts yet",
-    "emptyHistoryDesc": "Completed sales from the POS counter will appear here."
+    "emptyHistoryDesc": "Completed sales from the POS counter will appear here.",
+    "invoicesCount": "Invoices",
+    "totalSales": "Total Sales",
+    "saleDateLabel": "Sale Date",
+    "noteLabel": "Note (Optional)",
+    "notePlaceholder": "Enter any note",
+    "editModalTitle": "Edit Sale Information",
+    "editModalSubtitle": "You can change the sale date and note.",
+    "deleteButton": "Delete / Void Invoice"
   },
   "receipt": {
     "title": "Sales Receipt",

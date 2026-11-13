@@ -50,6 +50,8 @@ export interface CreateSalePayload {
     productId: string;
     unitId: string;
     qtyDisplay: string;
+    unitPricePoisha?: number;
+    lineTotalPoisha?: number;
   }[];
   discountType?: DiscountType;
   discountValue?: string | number;
@@ -60,6 +62,26 @@ export interface CreateSalePayload {
   }[];
   tenderedPoisha?: number | null;
   note?: string | null;
+  soldAt?: string;
+}
+
+export interface CreateQuickSalePayload {
+  id?: string;
+  totalSellingPricePoisha: number;
+  quantity?: number | string;
+  note?: string | null;
+  soldAt?: string;
+  paymentMethod?: PaymentMethod;
+  paidPoisha?: number;
+  customerId?: string | null;
+  productId?: string | null;
+  unitId?: string | null;
+}
+
+export interface UpdateSalePayload {
+  soldAt?: string;
+  note?: string | null;
+  customerId?: string | null;
 }
 
 export interface CreateSaleReturnPayload {
@@ -168,6 +190,16 @@ export const salesApi = {
     });
   },
 
+  quickSale(
+    body: CreateQuickSalePayload,
+    idempotencyKey?: string,
+  ): Promise<{ sale: SaleDto; idempotencyReplayed: boolean }> {
+    const key = idempotencyKey ?? Crypto.randomUUID();
+    return unwrapApiPost('/sales/quick', body, {
+      'X-Idempotency-Key': key,
+    });
+  },
+
   createReturn(
     saleId: string,
     body: CreateSaleReturnPayload,
@@ -188,6 +220,24 @@ export const salesApi = {
     return unwrapApiPost(`/sales/${saleId}/cancel`, body, {
       'X-Idempotency-Key': key,
     });
+  },
+
+  update(saleId: string, body: UpdateSalePayload): Promise<{ sale: SaleDto }> {
+    return unwrapApiPatch(`/sales/${saleId}`, body);
+  },
+
+  delete(
+    saleId: string,
+    reason?: string,
+    idempotencyKey?: string,
+  ): Promise<{ sale: SaleDto; idempotencyReplayed: boolean }> {
+    const key = idempotencyKey ?? Crypto.randomUUID();
+    return apiClient
+      .delete<{ data: { sale: SaleDto; idempotencyReplayed: boolean } }>(`/sales/${saleId}`, {
+        headers: { 'X-Idempotency-Key': key },
+        data: { reason: reason ?? 'Deleted by merchant' },
+      })
+      .then((r) => r.data.data);
   },
 
   async downloadReceiptPdf(

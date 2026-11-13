@@ -2,6 +2,15 @@ import { z } from 'zod';
 
 const ymdDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must use YYYY-MM-DD format');
 
+export const dashboardQuerySchema = z.strictObject({
+  period: z.enum(['day', 'week', 'month']).optional().default('day'),
+  date: ymdDateSchema.optional(),
+  from: ymdDateSchema.optional(),
+  to: ymdDateSchema.optional(),
+});
+
+export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
 export const dateRangeQuerySchema = z.strictObject({
   from: ymdDateSchema.optional(),
   to: ymdDateSchema.optional(),

@@ -12,8 +12,18 @@ import type {
 import { apiClient, unwrapApiGet } from './client';
 
 export const reportsApi = {
-  getDashboard(): Promise<{ dashboard: DashboardSummaryResponse }> {
-    return unwrapApiGet('/reports/dashboard');
+  getDashboard(params?: {
+    period?: 'day' | 'week' | 'month';
+    date?: string;
+    from?: string;
+    to?: string;
+  }): Promise<{ dashboard: DashboardSummaryResponse }> {
+    const query: Record<string, string> = {};
+    if (params?.period) query.period = params.period;
+    if (params?.date) query.date = params.date;
+    if (params?.from) query.from = params.from;
+    if (params?.to) query.to = params.to;
+    return unwrapApiGet('/reports/dashboard', query);
   },
 
   getSalesReport(params: {

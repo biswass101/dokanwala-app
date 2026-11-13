@@ -936,7 +936,7 @@ model SyncOperation {
   entityType     String              @map("entity_type") @db.VarChar(60)
   entityId       String              @map("entity_id") @db.Uuid
   status         SyncOperationStatus
-  syncSeq        BigInt              @default(dbgenerated("nextval('sync_seq_global')")) @map("sync_seq")
+  syncSeq        BigInt              @default(dbgenerated("nextval('sync_seq_global'::regclass)")) @map("sync_seq")
   resultJson     Json?               @map("result_json")
   errorCode      String?             @map("error_code") @db.VarChar(60)
   errorMessage   String?             @map("error_message") @db.VarChar(300)
@@ -954,7 +954,7 @@ model SyncOperation {
 }
 
 model SyncChange {
-  syncSeq    BigInt           @id @default(dbgenerated("nextval('sync_seq_global')")) @map("sync_seq")
+  syncSeq    BigInt           @id @default(dbgenerated("nextval('sync_seq_global'::regclass)")) @map("sync_seq")
   shopId     String           @map("shop_id") @db.Uuid
   entityType String           @map("entity_type") @db.VarChar(60)
   entityId   String           @map("entity_id") @db.Uuid

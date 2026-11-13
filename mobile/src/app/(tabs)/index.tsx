@@ -1,10 +1,12 @@
 import {
   formatDhakaDate,
   formatDhakaDateTime,
+  getDhakaYmd,
+  shiftDhakaYmd,
   type RecentDashboardTransactionDto,
 } from '@dokanwala/shared';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import {
   AppText,
@@ -16,6 +18,8 @@ import {
   ScreenContainer,
   SyncStatusPill,
 } from '@/components';
+import { FilterChip } from '@/features/products/components/FilterChip';
+import { DashboardComparisonChart } from '@/features/reports/components/DashboardComparisonChart';
 import { useDashboardSummaryQuery } from '@/features/reports/hooks/useCashbookReportsQueries';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { useFormattedMoney } from '@/hooks/useFormattedMoney';
@@ -30,7 +34,14 @@ export default function HomeScreen() {
   const user = useAuthStore((state) => state.user);
   const shop = useAuthStore((state) => state.shop);
 
-  const dashboardQuery = useDashboardSummaryQuery();
+  const todayYmd = getDhakaYmd();
+  const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month'>('day');
+  const [selectedDate, setSelectedDate] = useState<string>(todayYmd);
+
+  const dashboardQuery = useDashboardSummaryQuery({
+    period: selectedPeriod,
+    date: selectedDate,
+  });
   const isOwner = user?.role === 'OWNER';
   const dashboard = dashboardQuery.data?.dashboard;
   const fromOfflineCache = Boolean(dashboardQuery.data?.fromOfflineCache);
@@ -132,7 +143,14 @@ export default function HomeScreen() {
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <Button
+            label={t('home.actions.quickSale', { defaultValue: '⚡ সরাসরি বিক্রি' })}
+            onPress={() => router.push('/sales/quick')}
+            style={{ flexGrow: 1, minWidth: '45%' }}
+            testID="home-quick-sale-btn"
+          />
+          <Button
             label={t('home.actions.newSale')}
+            variant="secondary"
             onPress={() => router.push('/(tabs)/sales')}
             style={{ flexGrow: 1, minWidth: '45%' }}
           />
@@ -182,6 +200,86 @@ export default function HomeScreen() {
         />
       ) : dashboard ? (
         <>
+          {/* Period Selection Bar */}
+          <View style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <FilterChip
+                label={t('home.periodDay', { defaultValue: 'আজ / নির্দিষ্ট দিন' })}
+                selected={selectedPeriod === 'day'}
+                onPress={() => setSelectedPeriod('day')}
+              />
+              <FilterChip
+                label={t('home.periodWeek', { defaultValue: 'সপ্তাহ' })}
+                selected={selectedPeriod === 'week'}
+                onPress={() => setSelectedPeriod('week')}
+              />
+              <FilterChip
+                label={t('home.periodMonth', { defaultValue: 'মাস' })}
+                selected={selectedPeriod === 'month'}
+                onPress={() => setSelectedPeriod('month')}
+              />
+            </View>
+
+            {/* Date Navigator for Day view */}
+            {selectedPeriod === 'day' ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: Colors.surface,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: Layout.cardRadius,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Previous day"
+                  onPress={() => setSelectedDate(shiftDhakaYmd(selectedDate, -1))}
+                  style={{ padding: 6 }}
+                >
+                  <AppText variant="body" weight="bold" color={Colors.primary}>
+                    ‹ {t('common.prevDay', { defaultValue: 'পূর্বের দিন' })}
+                  </AppText>
+                </Pressable>
+
+                <View style={{ alignItems: 'center', gap: 2 }}>
+                  <AppText variant="caption" weight="bold">
+                    {formatDhakaDate(`${selectedDate}T12:00:00+06:00`, language, digitStyle)}
+                  </AppText>
+                  {selectedDate === todayYmd ? (
+                    <Badge label={t('home.todayBadge', { defaultValue: 'আজ' })} tone="primary" />
+                  ) : (
+                    <Pressable onPress={() => setSelectedDate(todayYmd)}>
+                      <AppText variant="caption" color={Colors.primary} weight="semibold">
+                        {t('home.goToToday', { defaultValue: 'আজকে ফিরে যান' })}
+                      </AppText>
+                    </Pressable>
+                  )}
+                </View>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Next day"
+                  disabled={selectedDate >= todayYmd}
+                  onPress={() => setSelectedDate(shiftDhakaYmd(selectedDate, 1))}
+                  style={{ padding: 6, opacity: selectedDate >= todayYmd ? 0.3 : 1 }}
+                >
+                  <AppText
+                    variant="body"
+                    weight="bold"
+                    color={selectedDate >= todayYmd ? Colors.textMuted : Colors.primary}
+                  >
+                    {t('common.nextDay', { defaultValue: 'পরের দিন' })} ›
+                  </AppText>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+
           <Card style={{ gap: 12 }}>
             <View
               style={{
@@ -191,15 +289,23 @@ export default function HomeScreen() {
               }}
             >
               <AppText variant="sectionTitle" weight="semibold">
-                {t('home.todaySummaryTitle')}
+                {selectedPeriod === 'day'
+                  ? selectedDate === todayYmd
+                    ? t('home.todaySummaryTitle')
+                    : `${formatDhakaDate(`${selectedDate}T12:00:00+06:00`, language, digitStyle)} ${t('home.summarySuffix', { defaultValue: 'এর বিবরণ' })}`
+                  : selectedPeriod === 'week'
+                    ? t('home.weekSummaryTitle', { defaultValue: 'চলতি সপ্তাহের বিবরণ' })
+                    : t('home.monthSummaryTitle', { defaultValue: 'চলতি মাসের বিবরণ' })}
               </AppText>
               <AppText variant="caption" color={Colors.textSecondary}>
-                {formatDhakaDate(`${dashboard.businessDate}T12:00:00+06:00`, language, digitStyle)}
+                {dashboard.comparisonLabel
+                  ? `তুলনা: ${dashboard.comparisonLabel}`
+                  : formatDhakaDate(`${dashboard.businessDate}T12:00:00+06:00`, language, digitStyle)}
               </AppText>
             </View>
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              {/* Today's Sales */}
+              {/* Sales Card */}
               <View
                 style={{
                   flex: 1,
@@ -211,7 +317,11 @@ export default function HomeScreen() {
                 }}
               >
                 <AppText variant="caption" color={Colors.primaryPressed}>
-                  {t('home.todaySalesLabel')}
+                  {selectedPeriod === 'day'
+                    ? t('home.todaySalesLabel')
+                    : selectedPeriod === 'week'
+                      ? t('home.weekSalesLabel', { defaultValue: 'সপ্তাহের মোট বিক্রি' })
+                      : t('home.monthSalesLabel', { defaultValue: 'মাসের মোট বিক্রি' })}
                 </AppText>
                 <AppText variant="sectionTitle" weight="bold" color={Colors.primaryPressed}>
                   {formatMoney(dashboard.todayNetSalesPoisha)}
@@ -221,9 +331,20 @@ export default function HomeScreen() {
                     count: formatDigits(String(dashboard.todaySalesCount)),
                   })}
                 </AppText>
+                {dashboard.comparison?.sales ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <Badge
+                      label={`${dashboard.comparison.sales.growthPercent !== null && dashboard.comparison.sales.growthPercent >= 0 ? '↑ +' : '↓ '}${formatDigits(dashboard.comparison.sales.growthPercent ?? 0)}%`}
+                      tone={(dashboard.comparison.sales.growthPercent ?? 0) >= 0 ? 'success' : 'danger'}
+                    />
+                    <AppText variant="caption" color={Colors.textMuted} style={{ fontSize: 10 }}>
+                      vs {dashboard.comparisonLabel}
+                    </AppText>
+                  </View>
+                ) : null}
               </View>
 
-              {/* Today's Expenses */}
+              {/* Expenses Card */}
               <View
                 style={{
                   flex: 1,
@@ -235,7 +356,11 @@ export default function HomeScreen() {
                 }}
               >
                 <AppText variant="caption" color={Colors.warning}>
-                  {t('home.todayExpensesLabel')}
+                  {selectedPeriod === 'day'
+                    ? t('home.todayExpensesLabel')
+                    : selectedPeriod === 'week'
+                      ? t('home.weekExpensesLabel', { defaultValue: 'সপ্তাহের মোট খরচ' })
+                      : t('home.monthExpensesLabel', { defaultValue: 'মাসের মোট খরচ' })}
                 </AppText>
                 <AppText variant="sectionTitle" weight="bold" color={Colors.warning}>
                   {formatMoney(dashboard.todayExpensesPoisha)}
@@ -243,6 +368,17 @@ export default function HomeScreen() {
                 <AppText variant="caption" color={Colors.textSecondary}>
                   {t('home.todayCashReceivedLabel')}: {formatMoney(dashboard.todayCashReceivedPoisha)}
                 </AppText>
+                {dashboard.comparison?.expenses ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <Badge
+                      label={`${dashboard.comparison.expenses.growthPercent !== null && dashboard.comparison.expenses.growthPercent >= 0 ? '↑ +' : '↓ '}${formatDigits(dashboard.comparison.expenses.growthPercent ?? 0)}%`}
+                      tone={(dashboard.comparison.expenses.growthPercent ?? 0) <= 0 ? 'success' : 'warning'}
+                    />
+                    <AppText variant="caption" color={Colors.textMuted} style={{ fontSize: 10 }}>
+                      vs {dashboard.comparisonLabel}
+                    </AppText>
+                  </View>
+                ) : null}
               </View>
 
               {/* Owner-only Profit Cards */}
@@ -258,11 +394,24 @@ export default function HomeScreen() {
                   }}
                 >
                   <AppText variant="caption" color={Colors.success}>
-                    {t('home.todayGrossProfitLabel')}
+                    {selectedPeriod === 'day'
+                      ? t('home.todayGrossProfitLabel')
+                      : t('home.periodGrossProfitLabel', { defaultValue: 'মোট মোট লাভ' })}
                   </AppText>
                   <AppText variant="sectionTitle" weight="bold" color={Colors.success}>
                     {formatMoney(dashboard.todayGrossProfitPoisha)}
                   </AppText>
+                  {dashboard.comparison?.grossProfit ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                      <Badge
+                        label={`${dashboard.comparison.grossProfit.growthPercent !== null && dashboard.comparison.grossProfit.growthPercent >= 0 ? '↑ +' : '↓ '}${formatDigits(dashboard.comparison.grossProfit.growthPercent ?? 0)}%`}
+                        tone={(dashboard.comparison.grossProfit.growthPercent ?? 0) >= 0 ? 'success' : 'danger'}
+                      />
+                      <AppText variant="caption" color={Colors.textMuted} style={{ fontSize: 10 }}>
+                        vs {dashboard.comparisonLabel}
+                      </AppText>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
 
@@ -282,7 +431,9 @@ export default function HomeScreen() {
                     variant="caption"
                     color={dashboard.todayNetProfitPoisha >= 0 ? Colors.success : Colors.danger}
                   >
-                    {t('home.todayNetProfitLabel')}
+                    {selectedPeriod === 'day'
+                      ? t('home.todayNetProfitLabel')
+                      : t('home.periodNetProfitLabel', { defaultValue: 'নিট লাভ (লাভ - খরচ)' })}
                   </AppText>
                   <AppText
                     variant="sectionTitle"
@@ -291,6 +442,17 @@ export default function HomeScreen() {
                   >
                     {formatMoney(dashboard.todayNetProfitPoisha)}
                   </AppText>
+                  {dashboard.comparison?.netProfit ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                      <Badge
+                        label={`${dashboard.comparison.netProfit.growthPercent !== null && dashboard.comparison.netProfit.growthPercent >= 0 ? '↑ +' : '↓ '}${formatDigits(dashboard.comparison.netProfit.growthPercent ?? 0)}%`}
+                        tone={(dashboard.comparison.netProfit.growthPercent ?? 0) >= 0 ? 'success' : 'danger'}
+                      />
+                      <AppText variant="caption" color={Colors.textMuted} style={{ fontSize: 10 }}>
+                        vs {dashboard.comparisonLabel}
+                      </AppText>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
 
@@ -392,6 +554,15 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           </Card>
+
+          {/* Sales Comparison Chart & Payment Distribution */}
+          <DashboardComparisonChart
+            chartSeries={dashboard.chartSeries}
+            comparisonLabel={dashboard.comparisonLabel}
+            currentLabel={dashboard.periodLabel}
+            paymentDistribution={dashboard.paymentDistribution}
+            salesComparison={dashboard.comparison?.sales}
+          />
 
           {/* Daily Cashbook Status Banner */}
           <Card style={{ gap: 10 }}>

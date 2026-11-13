@@ -5,6 +5,11 @@ import {
   getDhakaWeekStartYmd,
   shiftDhakaYmd,
   type CustomerDueReportItemDto,
+  type DashboardChartPointDto,
+  type DashboardComparisonItemDto,
+  type DashboardComparisonMetricsDto,
+  type DashboardPaymentDistributionDto,
+  type DashboardPeriod,
   type DashboardSummaryResponse,
   type DuesReportResponse,
   type ProductPerformanceItemDto,
@@ -23,6 +28,7 @@ import { prisma } from '../../database/prisma.js';
 import { ValidationError } from '../../shared/errors/app-error.js';
 import { formatDhakaYmd, getDhakaDayRangeUtc } from '../../shared/utils/timezone.js';
 import { getCashbookSummary } from '../cashbook/cashbook.service.js';
+import type { DashboardQuery } from './reports.schema.js';
 
 function resolveDateRange(
   from?: string,
@@ -63,17 +69,66 @@ function getMonthRangeStartYmd(todayYmd: string, monthsBack: number): string {
 export async function getDashboardSummary(
   shopId: string,
   role: UserRole,
+  query?: DashboardQuery,
 ): Promise<DashboardSummaryResponse> {
-  const businessDate = formatDhakaYmd();
-  const { startUtc, endUtc } = getDhakaDayRangeUtc(businessDate);
+  const todayYmd = formatDhakaYmd();
+  const period: DashboardPeriod = query?.period ?? 'day';
+  const refDate = query?.date ?? todayYmd;
   const isOwner = role === 'OWNER';
 
+  let fromDate: string;
+  let toDate: string;
+  let prevFromDate: string;
+  let prevToDate: string;
+  let periodLabel: string;
+  let comparisonLabel: string;
+
+  if (period === 'week') {
+    fromDate = shiftDhakaYmd(refDate, -6);
+    toDate = refDate;
+    prevFromDate = shiftDhakaYmd(refDate, -13);
+    prevToDate = shiftDhakaYmd(refDate, -7);
+    periodLabel = 'চলতি সপ্তাহ';
+    comparisonLabel = 'গত সপ্তাহ';
+  } else if (period === 'month') {
+    fromDate = getDhakaMonthStartYmd(refDate);
+    toDate = refDate;
+    prevFromDate = getMonthRangeStartYmd(fromDate, 1);
+    prevToDate = shiftDhakaYmd(fromDate, -1);
+    periodLabel = 'চলতি মাস';
+    comparisonLabel = 'গত মাস';
+  } else {
+    fromDate = refDate;
+    toDate = refDate;
+    prevFromDate = shiftDhakaYmd(refDate, -1);
+    prevToDate = prevFromDate;
+    periodLabel = refDate === todayYmd ? 'আজ' : refDate;
+    comparisonLabel = 'গতকাল';
+  }
+
+  const { startUtc, endUtc } = {
+    startUtc: getDhakaDayRangeUtc(fromDate).startUtc,
+    endUtc: getDhakaDayRangeUtc(toDate).endUtc,
+  };
+  const { prevStartUtc, prevEndUtc } = {
+    prevStartUtc: getDhakaDayRangeUtc(prevFromDate).startUtc,
+    prevEndUtc: getDhakaDayRangeUtc(prevToDate).endUtc,
+  };
+
   const [
-    salesToday,
-    returnsToday,
-    wastageRowsToday,
-    expensesToday,
-    customerPaymentsToday,
+    salesCurrent,
+    returnsCurrent,
+    wastageCurrent,
+    expensesCurrent,
+    customerPaymentsCurrent,
+    paymentsCurrent,
+    salesPrev,
+    returnsPrev,
+    wastagePrev,
+    expensesPrev,
+    customerPaymentsPrev,
+    chartSalesCurrent,
+    chartSalesPrev,
     productsWithBalances,
     customerDueAgg,
     supplierPayableAgg,
@@ -84,6 +139,7 @@ export async function getDashboardSummary(
     recentPurchases,
     recentSupplierPayments,
   ] = await Promise.all([
+    // Current period
     prisma.sale.findMany({
       where: {
         shopId,
@@ -91,11 +147,13 @@ export async function getDashboardSummary(
         soldAt: { gte: startUtc, lte: endUtc },
       },
       select: {
+        id: true,
         subtotalPoisha: true,
         discountPoisha: true,
         totalPoisha: true,
         paidPoisha: true,
         cogsPoisha: true,
+        soldAt: true,
       },
     }),
     prisma.saleReturn.findMany({
@@ -131,6 +189,94 @@ export async function getDashboardSummary(
       },
       _sum: { amountPoisha: true },
     }),
+    prisma.payment.findMany({
+      where: {
+        shopId,
+        receivedAt: { gte: startUtc, lte: endUtc },
+      },
+      select: { method: true, amountPoisha: true },
+    }),
+
+    // Previous period
+    prisma.sale.findMany({
+      where: {
+        shopId,
+        status: { not: 'CANCELLED' },
+        soldAt: { gte: prevStartUtc, lte: prevEndUtc },
+      },
+      select: {
+        id: true,
+        subtotalPoisha: true,
+        discountPoisha: true,
+        totalPoisha: true,
+        paidPoisha: true,
+        cogsPoisha: true,
+        soldAt: true,
+      },
+    }),
+    prisma.saleReturn.findMany({
+      where: {
+        shopId,
+        returnedAt: { gte: prevStartUtc, lte: prevEndUtc },
+        sale: { status: { not: 'CANCELLED' } },
+      },
+      select: {
+        refundTotalPoisha: true,
+        items: { select: { restoredCogsPoisha: true } },
+      },
+    }),
+    prisma.stockAdjustment.findMany({
+      where: {
+        shopId,
+        adjustedAt: { gte: prevStartUtc, lte: prevEndUtc },
+        lossPoisha: { gt: 0 },
+      },
+      select: { lossPoisha: true },
+    }),
+    prisma.expense.aggregate({
+      where: {
+        shopId,
+        incurredAt: { gte: prevStartUtc, lte: prevEndUtc },
+      },
+      _sum: { amountPoisha: true },
+    }),
+    prisma.customerPayment.aggregate({
+      where: {
+        shopId,
+        paidAt: { gte: prevStartUtc, lte: prevEndUtc },
+      },
+      _sum: { amountPoisha: true },
+    }),
+
+    // Day-mode chart series: 7 days leading to refDate vs prior 7 days
+    period === 'day'
+      ? prisma.sale.findMany({
+          where: {
+            shopId,
+            status: { not: 'CANCELLED' },
+            soldAt: {
+              gte: getDhakaDayRangeUtc(shiftDhakaYmd(refDate, -6)).startUtc,
+              lte: getDhakaDayRangeUtc(refDate).endUtc,
+            },
+          },
+          select: { totalPoisha: true, soldAt: true },
+        })
+      : Promise.resolve([]),
+    period === 'day'
+      ? prisma.sale.findMany({
+          where: {
+            shopId,
+            status: { not: 'CANCELLED' },
+            soldAt: {
+              gte: getDhakaDayRangeUtc(shiftDhakaYmd(refDate, -13)).startUtc,
+              lte: getDhakaDayRangeUtc(shiftDhakaYmd(refDate, -7)).endUtc,
+            },
+          },
+          select: { totalPoisha: true, soldAt: true },
+        })
+      : Promise.resolve([]),
+
+    // Shop catalog & balances
     prisma.product.findMany({
       where: { shopId, deletedAt: null, isActive: true },
       select: {
@@ -147,7 +293,9 @@ export async function getDashboardSummary(
       where: { shopId, deletedAt: null, payablePoisha: { gt: 0 } },
       _sum: { payablePoisha: true },
     }),
-    getCashbookSummary(shopId, businessDate),
+    getCashbookSummary(shopId, refDate),
+
+    // Recent activity list
     prisma.sale.findMany({
       where: { shopId, status: { not: 'CANCELLED' } },
       orderBy: [{ soldAt: 'desc' }],
@@ -212,40 +360,214 @@ export async function getDashboardSummary(
       : Promise.resolve([]),
   ]);
 
-  let grossSalesToday = 0;
-  let discountsToday = 0;
-  let paidAtSaleToday = 0;
-  let dueGivenToday = 0;
-  let grossCogsToday = 0;
+  // Current period computations
+  let grossSalesCurrent = 0;
+  let discountsCurrent = 0;
+  let paidAtSaleCurrent = 0;
+  let dueGivenCurrent = 0;
+  let grossCogsCurrent = 0;
 
-  for (const s of salesToday) {
-    grossSalesToday += s.subtotalPoisha;
-    discountsToday += s.discountPoisha;
-    paidAtSaleToday += s.paidPoisha;
-    dueGivenToday += Math.max(0, s.totalPoisha - s.paidPoisha);
-    grossCogsToday += s.cogsPoisha;
+  for (const s of salesCurrent) {
+    grossSalesCurrent += s.subtotalPoisha;
+    discountsCurrent += s.discountPoisha;
+    paidAtSaleCurrent += s.paidPoisha;
+    dueGivenCurrent += Math.max(0, s.totalPoisha - s.paidPoisha);
+    grossCogsCurrent += s.cogsPoisha;
   }
 
-  let returnsTotalToday = 0;
-  let restoredCogsToday = 0;
-  for (const ret of returnsToday) {
-    returnsTotalToday += ret.refundTotalPoisha;
+  let returnsTotalCurrent = 0;
+  let restoredCogsCurrent = 0;
+  for (const ret of returnsCurrent) {
+    returnsTotalCurrent += ret.refundTotalPoisha;
     for (const item of ret.items) {
-      restoredCogsToday += item.restoredCogsPoisha;
+      restoredCogsCurrent += item.restoredCogsPoisha;
     }
   }
 
-  let wastageLossToday = 0;
-  for (const adj of wastageRowsToday) {
-    wastageLossToday += adj.lossPoisha;
+  let wastageLossCurrent = 0;
+  for (const adj of wastageCurrent) {
+    wastageLossCurrent += adj.lossPoisha;
   }
 
-  const todayNetSalesPoisha = grossSalesToday - discountsToday - returnsTotalToday;
-  const todayNetCogsPoisha = grossCogsToday - restoredCogsToday;
-  const todayGrossProfitPoisha = todayNetSalesPoisha - todayNetCogsPoisha;
-  const todayExpensesPoisha = expensesToday._sum.amountPoisha ?? 0;
-  const todayNetProfitPoisha = todayGrossProfitPoisha - todayExpensesPoisha - wastageLossToday;
-  const todayDueCollectedPoisha = customerPaymentsToday._sum.amountPoisha ?? 0;
+  const netSalesCurrent = grossSalesCurrent - discountsCurrent - returnsTotalCurrent;
+  const netCogsCurrent = grossCogsCurrent - restoredCogsCurrent;
+  const grossProfitCurrent = netSalesCurrent - netCogsCurrent;
+  const expensesTotalCurrent = expensesCurrent._sum.amountPoisha ?? 0;
+  const netProfitCurrent = grossProfitCurrent - expensesTotalCurrent - wastageLossCurrent;
+  const dueCollectedCurrent = customerPaymentsCurrent._sum.amountPoisha ?? 0;
+  const cashReceivedCurrent = paidAtSaleCurrent + dueCollectedCurrent;
+
+  // Previous period computations
+  let grossSalesPrev = 0;
+  let discountsPrev = 0;
+  let paidAtSalePrev = 0;
+  let dueGivenPrev = 0;
+  let grossCogsPrev = 0;
+
+  for (const s of salesPrev) {
+    grossSalesPrev += s.subtotalPoisha;
+    discountsPrev += s.discountPoisha;
+    paidAtSalePrev += s.paidPoisha;
+    dueGivenPrev += Math.max(0, s.totalPoisha - s.paidPoisha);
+    grossCogsPrev += s.cogsPoisha;
+  }
+
+  let returnsTotalPrev = 0;
+  let restoredCogsPrev = 0;
+  for (const ret of returnsPrev) {
+    returnsTotalPrev += ret.refundTotalPoisha;
+    for (const item of ret.items) {
+      restoredCogsPrev += item.restoredCogsPoisha;
+    }
+  }
+
+  let wastageLossPrev = 0;
+  for (const adj of wastagePrev) {
+    wastageLossPrev += adj.lossPoisha;
+  }
+
+  const netSalesPrev = grossSalesPrev - discountsPrev - returnsTotalPrev;
+  const netCogsPrev = grossCogsPrev - restoredCogsPrev;
+  const grossProfitPrev = netSalesPrev - netCogsPrev;
+  const expensesTotalPrev = expensesPrev._sum.amountPoisha ?? 0;
+  const netProfitPrev = grossProfitPrev - expensesTotalPrev - wastageLossPrev;
+  const dueCollectedPrev = customerPaymentsPrev._sum.amountPoisha ?? 0;
+  const cashReceivedPrev = paidAtSalePrev + dueCollectedPrev;
+
+  // Delta calculation helper
+  function calcDelta(curr: number, prev: number): DashboardComparisonItemDto {
+    const diffPoisha = curr - prev;
+    let growthPercent: number | null = null;
+    if (prev > 0) {
+      growthPercent = Number((((curr - prev) / prev) * 100).toFixed(1));
+    } else if (curr > 0) {
+      growthPercent = 100;
+    } else {
+      growthPercent = 0;
+    }
+    return {
+      currentPoisha: curr,
+      previousPoisha: prev,
+      diffPoisha,
+      growthPercent,
+    };
+  }
+
+  const comparison: DashboardComparisonMetricsDto = {
+    sales: calcDelta(netSalesCurrent, netSalesPrev),
+    salesCount: {
+      current: salesCurrent.length,
+      previous: salesPrev.length,
+      diff: salesCurrent.length - salesPrev.length,
+      growthPercent:
+        salesPrev.length > 0
+          ? Number((((salesCurrent.length - salesPrev.length) / salesPrev.length) * 100).toFixed(1))
+          : salesCurrent.length > 0
+            ? 100
+            : 0,
+    },
+    expenses: calcDelta(expensesTotalCurrent, expensesTotalPrev),
+    grossProfit: isOwner ? calcDelta(grossProfitCurrent, grossProfitPrev) : null,
+    netProfit: isOwner ? calcDelta(netProfitCurrent, netProfitPrev) : null,
+    cashReceived: calcDelta(cashReceivedCurrent, cashReceivedPrev),
+    creditGiven: calcDelta(dueGivenCurrent, dueGivenPrev),
+  };
+
+  // Payment distribution
+  let cashPoisha = 0;
+  let bkashPoisha = 0;
+  let nagadPoisha = 0;
+  let otherPoisha = 0;
+
+  for (const p of paymentsCurrent) {
+    if (p.method === 'CASH') cashPoisha += p.amountPoisha;
+    else if (p.method === 'BKASH') bkashPoisha += p.amountPoisha;
+    else if (p.method === 'NAGAD') nagadPoisha += p.amountPoisha;
+    else otherPoisha += p.amountPoisha;
+  }
+  cashPoisha += dueCollectedCurrent;
+
+  const paymentDistribution: DashboardPaymentDistributionDto = {
+    cashPoisha,
+    bkashPoisha,
+    nagadPoisha,
+    otherPoisha,
+    creditPoisha: dueGivenCurrent,
+  };
+
+  // Build chart series
+  const chartSeries: DashboardChartPointDto[] = [];
+
+  if (period === 'day') {
+    // 7-day trend leading up to refDate
+    for (let i = 0; i < 7; i++) {
+      const dayYmd = shiftDhakaYmd(refDate, -6 + i);
+      const prevDayYmd = shiftDhakaYmd(refDate, -13 + i);
+
+      const daySales = chartSalesCurrent.filter((s) => formatDhakaYmd(s.soldAt) === dayYmd);
+      const prevDaySales = chartSalesPrev.filter((s) => formatDhakaYmd(s.soldAt) === prevDayYmd);
+
+      const currentPoisha = daySales.reduce((sum, s) => sum + s.totalPoisha, 0);
+      const previousPoisha = prevDaySales.reduce((sum, s) => sum + s.totalPoisha, 0);
+
+      chartSeries.push({
+        key: dayYmd,
+        label: `${dayYmd.slice(8)}/${dayYmd.slice(5, 7)}`,
+        currentPoisha,
+        previousPoisha,
+        currentCount: daySales.length,
+        previousCount: prevDaySales.length,
+      });
+    }
+  } else if (period === 'week') {
+    // 7 days of the week vs previous week's 7 days
+    for (let i = 0; i < 7; i++) {
+      const dayYmd = shiftDhakaYmd(fromDate, i);
+      const prevDayYmd = shiftDhakaYmd(prevFromDate, i);
+
+      const daySales = salesCurrent.filter((s) => formatDhakaYmd(s.soldAt) === dayYmd);
+      const prevDaySales = salesPrev.filter((s) => formatDhakaYmd(s.soldAt) === prevDayYmd);
+
+      const currentPoisha = daySales.reduce((sum, s) => sum + s.totalPoisha, 0);
+      const previousPoisha = prevDaySales.reduce((sum, s) => sum + s.totalPoisha, 0);
+
+      chartSeries.push({
+        key: dayYmd,
+        label: `${dayYmd.slice(8)}/${dayYmd.slice(5, 7)}`,
+        currentPoisha,
+        previousPoisha,
+        currentCount: daySales.length,
+        previousCount: prevDaySales.length,
+      });
+    }
+  } else {
+    // Month: group into days of the month
+    const startDay = 1;
+    const endDay = Number(toDate.slice(8));
+    const yearMonth = toDate.slice(0, 7);
+    const prevYearMonth = prevToDate.slice(0, 7);
+
+    for (let d = startDay; d <= endDay; d++) {
+      const dayStr = String(d).padStart(2, '0');
+      const dayYmd = `${yearMonth}-${dayStr}`;
+      const prevDayYmd = `${prevYearMonth}-${dayStr}`;
+
+      const daySales = salesCurrent.filter((s) => formatDhakaYmd(s.soldAt) === dayYmd);
+      const prevDaySales = salesPrev.filter((s) => formatDhakaYmd(s.soldAt) === prevDayYmd);
+
+      const currentPoisha = daySales.reduce((sum, s) => sum + s.totalPoisha, 0);
+      const previousPoisha = prevDaySales.reduce((sum, s) => sum + s.totalPoisha, 0);
+
+      chartSeries.push({
+        key: dayYmd,
+        label: dayStr,
+        currentPoisha,
+        previousPoisha,
+        currentCount: daySales.length,
+        previousCount: prevDaySales.length,
+      });
+    }
+  }
 
   let lowStockCount = 0;
   for (const product of productsWithBalances) {
@@ -321,19 +643,19 @@ export async function getDashboardSummary(
   recentItems.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
 
   return {
-    businessDate,
-    todaySalesPoisha: grossSalesToday - discountsToday,
-    todaySalesCount: salesToday.length,
-    todayReturnsPoisha: returnsTotalToday,
-    todayNetSalesPoisha,
-    todayCogsPoisha: isOwner ? todayNetCogsPoisha : null,
-    todayGrossProfitPoisha: isOwner ? todayGrossProfitPoisha : null,
-    todayWastageLossPoisha: isOwner ? wastageLossToday : null,
-    todayExpensesPoisha,
-    todayNetProfitPoisha: isOwner ? todayNetProfitPoisha : null,
-    todayCashReceivedPoisha: paidAtSaleToday + todayDueCollectedPoisha,
-    todayDueGivenPoisha: dueGivenToday,
-    todayDueCollectedPoisha,
+    businessDate: refDate,
+    todaySalesPoisha: grossSalesCurrent - discountsCurrent,
+    todaySalesCount: salesCurrent.length,
+    todayReturnsPoisha: returnsTotalCurrent,
+    todayNetSalesPoisha: netSalesCurrent,
+    todayCogsPoisha: isOwner ? netCogsCurrent : null,
+    todayGrossProfitPoisha: isOwner ? grossProfitCurrent : null,
+    todayWastageLossPoisha: isOwner ? wastageLossCurrent : null,
+    todayExpensesPoisha: expensesTotalCurrent,
+    todayNetProfitPoisha: isOwner ? netProfitCurrent : null,
+    todayCashReceivedPoisha: cashReceivedCurrent,
+    todayDueGivenPoisha: dueGivenCurrent,
+    todayDueCollectedPoisha: dueCollectedCurrent,
     totalProducts: productsWithBalances.length,
     lowStockCount,
     customerDueTotalPoisha: customerDueAgg._sum.duePoisha ?? 0,
@@ -341,6 +663,14 @@ export async function getDashboardSummary(
     cashbookStatus: cashbookSummary.session ? cashbookSummary.session.status : 'UNOPENED',
     cashbookExpectedCashPoisha: cashbookSummary.liveExpectedClosingCashPoisha,
     recentTransactions: recentItems.slice(0, 8),
+    period,
+    periodLabel,
+    comparisonLabel,
+    fromDate,
+    toDate,
+    comparison,
+    chartSeries,
+    paymentDistribution,
   };
 }
 

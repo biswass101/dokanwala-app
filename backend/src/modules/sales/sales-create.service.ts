@@ -27,7 +27,7 @@ import {
   requireIdempotencyKey,
   type RequestMeta,
 } from './sales.helpers.js';
-import type { CreateSaleInput } from './sales.schema.js';
+import type { CreateQuickSaleInput, CreateSaleInput } from './sales.schema.js';
 import { saleInclude, toSaleDto } from './sales.types.js';
 
 export interface CreateSaleSyncOptions {
@@ -189,9 +189,13 @@ async function createSaleInternal(
         const prevProductReq = totalRequestedBaseByProduct.get(product.id) ?? new Decimal(0);
         totalRequestedBaseByProduct.set(product.id, prevProductReq.plus(qtyBaseDec));
 
-        const serverUnitSellingPricePoisha =
+        const catalogPricePoisha =
           unitRule.sellingPricePoisha ??
           calculateLineTotalPoisha(factorStr, product.baseSellingPricePoisha);
+        const serverUnitSellingPricePoisha =
+          reqItem.unitPricePoisha !== undefined
+            ? reqItem.unitPricePoisha
+            : catalogPricePoisha;
         const offlineOverridePrice = syncOptions?.offlineItemPrices?.[lineIdx];
         const unitSellingPricePoisha =
           offlineOverridePrice !== undefined && offlineOverridePrice >= 0
@@ -210,10 +214,13 @@ async function createSaleInternal(
           });
         }
 
-        const lineSubtotalPoisha = calculateLineTotalPoisha(
-          reqItem.qtyDisplay,
-          unitSellingPricePoisha,
-        );
+        const lineSubtotalPoisha =
+          reqItem.lineTotalPoisha !== undefined
+            ? reqItem.lineTotalPoisha
+            : calculateLineTotalPoisha(
+                reqItem.qtyDisplay,
+                unitSellingPricePoisha,
+              );
         const lineCogsPoisha = calculateLineCogsPoisha(qtyBaseStr, bal.avgCostBdt);
 
         subtotalPoisha = addPoisha(subtotalPoisha, lineSubtotalPoisha);
@@ -251,7 +258,9 @@ async function createSaleInternal(
         if (!bal || !product) continue;
 
         if (bal.qtyDec.lt(requestedDec)) {
-          if (!allowNegative) {
+          const isGeneralQuickSale =
+            product.barcode === 'QUICK_SALE' || product.nameBn === 'সাধারণ বিক্রি';
+          if (!allowNegative && !isGeneralQuickSale) {
             throw new ConflictError(
               `Insufficient stock for ${product.nameBn}`,
               ErrorCodes.INSUFFICIENT_STOCK,
@@ -389,7 +398,11 @@ async function createSaleInternal(
         });
       }
 
-      const soldAt = syncOptions?.offlineSoldAt ? new Date(syncOptions.offlineSoldAt) : new Date();
+      const soldAt = input.soldAt
+        ? new Date(input.soldAt)
+        : syncOptions?.offlineSoldAt
+          ? new Date(syncOptions.offlineSoldAt)
+          : new Date();
       const receiptNumber = await generateDailyNumber(tx, {
         table: 'sales',
         shopId,
@@ -634,3 +647,195 @@ async function createSaleInternal(
     throw err;
   }
 }
+
+async function ensureGeneralSaleProduct(
+  tx: Prisma.TransactionClient,
+  shopId: string,
+): Promise<{ productId: string; unitId: string }> {
+  const existing = await tx.product.findFirst({
+    where: {
+      shopId,
+      deletedAt: null,
+      OR: [{ barcode: 'QUICK_SALE' }, { nameBn: 'সাধারণ বিক্রি' }],
+    },
+    include: {
+      productUnits: {
+        where: { isActive: true },
+        include: { unit: true },
+      },
+    },
+  });
+
+  if (existing && existing.productUnits.length > 0) {
+    const unitId = existing.defaultSaleUnitId;
+    const bal = await tx.inventoryBalance.findUnique({
+      where: { productId: existing.id },
+    });
+    if (!bal) {
+      await tx.inventoryBalance.create({
+        data: {
+          productId: existing.id,
+          shopId,
+          qtyBase: '999999.0000',
+          avgCostPerBaseBdt: '0.000000',
+          version: 1,
+        },
+      });
+    }
+    return { productId: existing.id, unitId };
+  }
+
+  let pieceUnit = await tx.unit.findFirst({
+    where: { shopId, code: 'PIECE' },
+  });
+  if (!pieceUnit) {
+    pieceUnit = await tx.unit.findFirst({ where: { shopId } });
+  }
+  if (!pieceUnit) {
+    pieceUnit = await tx.unit.create({
+      data: {
+        shopId,
+        code: 'PIECE',
+        nameBn: 'টি',
+        nameEn: 'Piece',
+        isFractional: false,
+        isDefault: true,
+      },
+    });
+  }
+
+  let category = await tx.category.findFirst({
+    where: { shopId, nameBn: 'অন্যান্য', deletedAt: null },
+  });
+  if (!category) {
+    category = await tx.category.findFirst({
+      where: { shopId, deletedAt: null },
+    });
+  }
+  if (!category) {
+    category = await tx.category.create({
+      data: {
+        shopId,
+        nameBn: 'অন্যান্য',
+        nameEn: 'Miscellaneous',
+        sortOrder: 99,
+        isActive: true,
+      },
+    });
+  }
+
+  const created = await tx.product.create({
+    data: {
+      shopId,
+      nameBn: 'সাধারণ বিক্রি',
+      nameEn: 'General Sale',
+      barcode: 'QUICK_SALE',
+      categoryId: category.id,
+      baseUnitId: pieceUnit.id,
+      defaultSaleUnitId: pieceUnit.id,
+      defaultPurchaseUnitId: pieceUnit.id,
+      baseSellingPricePoisha: 0,
+      lastPurchasePricePoisha: 0,
+      lowStockThresholdBase: '0.0000',
+      isActive: true,
+      productUnits: {
+        create: {
+          shopId,
+          unitId: pieceUnit.id,
+          conversionFactorToBase: '1.0000',
+          sellingPricePoisha: 0,
+          isActive: true,
+        },
+      },
+      inventoryBalance: {
+        create: {
+          shopId,
+          qtyBase: '999999.0000',
+          avgCostPerBaseBdt: '0.000000',
+          version: 1,
+        },
+      },
+    },
+  });
+
+  return { productId: created.id, unitId: pieceUnit.id };
+}
+
+export async function createQuickSale(
+  shopId: string,
+  actorUserId: string,
+  role: UserRole,
+  input: CreateQuickSaleInput,
+  meta: RequestMeta,
+): Promise<{ sale: SaleDto; idempotencyReplayed: boolean }> {
+  let productId = input.productId;
+  let unitId = input.unitId;
+
+  if (!productId) {
+    const general = await prisma.$transaction(async (tx) => {
+      return ensureGeneralSaleProduct(tx, shopId);
+    });
+    productId = general.productId;
+    unitId = general.unitId;
+  } else if (!unitId) {
+    const prod = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { defaultSaleUnitId: true },
+    });
+    if (!prod) {
+      throw new NotFoundError('Selected product not found');
+    }
+    unitId = prod.defaultSaleUnitId;
+  }
+
+  const totalSellingPricePoisha = input.totalSellingPricePoisha;
+  const qtyDec = new Decimal(input.quantity);
+  const unitPricePoisha = qtyDec.eq(1)
+    ? totalSellingPricePoisha
+    : Math.max(1, Math.round(new Decimal(totalSellingPricePoisha).dividedBy(qtyDec).toNumber()));
+
+  const paidPoisha =
+    input.paidPoisha !== undefined ? input.paidPoisha : totalSellingPricePoisha;
+
+  if (paidPoisha < totalSellingPricePoisha && !input.customerId) {
+    throw new BusinessRuleError(
+      'Credit or partial payment sales require selecting a customer',
+      ErrorCodes.BUSINESS_RULE_VIOLATION,
+      { totalSellingPricePoisha, paidPoisha },
+    );
+  }
+
+  const payments =
+    paidPoisha > 0
+      ? [
+          {
+            method: input.paymentMethod,
+            amountPoisha: paidPoisha,
+            reference: null,
+          },
+        ]
+      : [];
+
+  const saleInput: CreateSaleInput = {
+    ...(input.id !== undefined ? { id: input.id } : {}),
+    customerId: input.customerId ?? null,
+    items: [
+      {
+        productId,
+        unitId,
+        qtyDisplay: input.quantity,
+        unitPricePoisha,
+        lineTotalPoisha: totalSellingPricePoisha,
+      },
+    ],
+    discountType: 'FIXED_POISHA',
+    discountValue: '0.00',
+    payments,
+    tenderedPoisha: input.paymentMethod === 'CASH' ? paidPoisha : null,
+    note: input.note ?? null,
+    soldAt: input.soldAt,
+  };
+
+  return createSale(shopId, actorUserId, role, saleInput, meta);
+}
+

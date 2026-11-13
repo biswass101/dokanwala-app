@@ -3,18 +3,24 @@ import { getRequestMeta, requireRequestAuth } from '../../shared/utils/request-a
 import { sendSuccess } from '../../shared/utils/response.js';
 import type {
   CancelSaleInput,
+  CreateQuickSaleInput,
   CreateSaleInput,
   CreateSaleReturnInput,
+  DeleteSaleInput,
   ListSalesQuery,
   ReceiptPdfQuery,
+  UpdateSaleInput,
 } from './sales.schema.js';
 import { generateSaleReceiptPdf } from './sales-receipt-pdf.service.js';
 import {
   cancelSale,
+  createQuickSale,
   createSale,
   createSaleReturn,
+  deleteSale,
   getSaleById,
   listSales,
+  updateSale,
 } from './sales.service.js';
 
 export async function listSalesHandler(
@@ -58,6 +64,34 @@ export async function createSaleHandler(
       auth.userId,
       auth.role,
       req.body as CreateSaleInput,
+      getRequestMeta(req),
+    );
+    sendSuccess(
+      req,
+      res,
+      {
+        sale: result.sale,
+        idempotencyReplayed: result.idempotencyReplayed,
+      },
+      result.idempotencyReplayed ? 200 : 201,
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createQuickSaleHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const auth = requireRequestAuth(req);
+    const result = await createQuickSale(
+      auth.shopId,
+      auth.userId,
+      auth.role,
+      req.body as CreateQuickSaleInput,
       getRequestMeta(req),
     );
     sendSuccess(
@@ -149,6 +183,57 @@ export async function getSaleReceiptPdfHandler(
     res.setHeader('Content-Disposition', `attachment; filename="${pdf.filename}"`);
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).send(pdf.buffer);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateSaleHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const auth = requireRequestAuth(req);
+    const { id } = req.params as { id: string };
+    const sale = await updateSale(
+      auth.shopId,
+      auth.userId,
+      auth.role,
+      id,
+      req.body as UpdateSaleInput,
+    );
+    sendSuccess(req, res, { sale }, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteSaleHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const auth = requireRequestAuth(req);
+    const { id } = req.params as { id: string };
+    const result = await deleteSale(
+      auth.shopId,
+      auth.userId,
+      auth.role,
+      id,
+      req.body as DeleteSaleInput,
+      getRequestMeta(req),
+    );
+    sendSuccess(
+      req,
+      res,
+      {
+        sale: result.sale,
+        idempotencyReplayed: result.idempotencyReplayed,
+      },
+      200,
+    );
   } catch (err) {
     next(err);
   }

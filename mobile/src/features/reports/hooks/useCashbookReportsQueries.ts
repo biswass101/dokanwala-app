@@ -55,16 +55,21 @@ function isNetworkFailure(err: unknown): boolean {
   return err instanceof ApiClientError && err.code === 'NETWORK_ERROR';
 }
 
-export function useDashboardSummaryQuery() {
+export function useDashboardSummaryQuery(params?: {
+  period?: 'day' | 'week' | 'month';
+  date?: string;
+}) {
   const shopId = useAuthStore((s) => s.shop?.id ?? '');
   const role = useAuthStore((s) => s.user?.role ?? 'EMPLOYEE');
+  const period = params?.period ?? 'day';
+  const date = params?.date ?? '';
 
   return useQuery<{ dashboard: DashboardSummaryResponse; fromOfflineCache: boolean }>({
-    queryKey: reportsKeys.dashboard(),
+    queryKey: ['reports', 'dashboard', period, date],
     queryFn: async () => {
-      const cacheKey = `dashboard:${role}`;
+      const cacheKey = `dashboard:${role}:${period}:${date}`;
       try {
-        const res = await reportsApi.getDashboard();
+        const res = await reportsApi.getDashboard(params);
         await saveLocalReportSnapshot(shopId, cacheKey, res.dashboard);
         return { dashboard: res.dashboard, fromOfflineCache: false };
       } catch (err) {

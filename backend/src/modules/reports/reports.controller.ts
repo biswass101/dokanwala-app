@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { requireRequestAuth } from '../../shared/utils/request-auth.js';
 import { sendSuccess } from '../../shared/utils/response.js';
 import type {
+  DashboardQuery,
   DateRangeQuery,
   ExportReportQuery,
   ProductsReportQuery,
@@ -23,7 +24,8 @@ export async function getDashboardSummaryHandler(
 ): Promise<void> {
   try {
     const auth = requireRequestAuth(req);
-    const dashboard = await getDashboardSummary(auth.shopId, auth.role);
+    const query = req.query as unknown as DashboardQuery;
+    const dashboard = await getDashboardSummary(auth.shopId, auth.role, query);
     sendSuccess(req, res, { dashboard }, 200);
   } catch (err) {
     next(err);

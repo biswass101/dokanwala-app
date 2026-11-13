@@ -25,7 +25,20 @@
     "errorFallback": "কিছু একটা সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
     "phaseBadge": "পরবর্তী ধাপে যুক্ত হবে",
     "savedSuccess": "সফলভাবে সংরক্ষিত হয়েছে",
-    "offlineCachedBadge": "অফলাইন ক্যাশ থেকে দেখানো হচ্ছে"
+    "offlineCachedBadge": "অফলাইন ক্যাশ থেকে দেখানো হচ্ছে",
+    "today": "আজ",
+    "yesterday": "গতকাল",
+    "twoDaysAgo": "২ দিন আগে",
+    "last7Days": "৭ দিন",
+    "thisMonth": "চলতি মাস",
+    "prevDay": "পূর্বের দিন",
+    "nextDay": "পরের দিন",
+    "customDate": "কাস্টম তারিখ",
+    "customRange": "কাস্টম তারিখ",
+    "done": "সম্পন্ন",
+    "change": "তারিখ পরিবর্তন",
+    "apply": "সেট করুন",
+    "edit": "সম্পাদনা"
   },
   "roles": {
     "OWNER": "মালিক",
@@ -238,12 +251,31 @@
     "txKindCustomerPayment": "বাকি আদায়",
     "txKindSupplierPayment": "মহাজন পরিশোধ",
     "actions": {
+      "quickSale": "⚡ সরাসরি বিক্রি",
       "newSale": "নতুন বিক্রি",
       "addProduct": "পণ্য যোগ",
       "purchase": "মাল কেনা",
       "expense": "খরচ যোগ",
       "collectDue": "বাকি আদায়"
-    }
+    },
+    "periodDay": "আজ / নির্দিষ্ট দিন",
+    "periodWeek": "সপ্তাহ",
+    "periodMonth": "মাস",
+    "weekSummaryTitle": "চলতি সপ্তাহের বিবরণ",
+    "monthSummaryTitle": "চলতি মাসের বিবরণ",
+    "summarySuffix": "এর বিবরণ",
+    "weekSalesLabel": "সপ্তাহের মোট বিক্রি",
+    "monthSalesLabel": "মাসের মোট বিক্রি",
+    "weekExpensesLabel": "সপ্তাহের মোট খরচ",
+    "monthExpensesLabel": "মাসের মোট খরচ",
+    "periodGrossProfitLabel": "মোট লাভ",
+    "periodNetProfitLabel": "নিট লাভ (লাভ - খরচ)",
+    "salesComparisonChartTitle": "বিক্রি তুলনা ও ট্রেন্ড",
+    "chartSubtitle": "চলতি বনাম পূর্ববর্তী সময়ের তুলনামূলক চার্ট",
+    "paymentBreakdownTitle": "পেমেন্ট মাধ্যম অনুপাত",
+    "totalRecorded": "মোট",
+    "todayBadge": "আজ",
+    "goToToday": "আজকে ফিরে যান"
   },
   "products": {
     "title": "পণ্য ও মজুত (স্টক)",
@@ -398,6 +430,14 @@
   },
   "pos": {
     "title": "নতুন বিক্রি (POS)",
+    "quickSaleTitle": "সরাসরি বিক্রি",
+    "modes": {
+      "catalog": "পণ্য তালিকা বিক্রি",
+      "quick": "⚡ সরাসরি / দৈনিক বিক্রি"
+    },
+    "amountRequired": "অনুগ্রহ করে বিক্রির টাকার পরিমাণ লিখুন",
+    "qtyRequired": "পরিমাণ অন্তত ১ হতে হবে",
+    "customerRequiredForDue": "বাকি বিক্রির জন্য কাস্টমার নির্বাচন আবশ্যক",
     "historyButton": "বিক্রির ইতিহাস",
     "frequentItemsTitle": "জনপ্রিয় / দ্রুত পণ্য",
     "searchPlaceholder": "পণ্য খুঁজুন (যেমন: পান, সুপারি, জর্দা)...",
@@ -428,7 +468,8 @@
     "notePlaceholder": "যেমন: জরুরি ডেলিভারি বা বিশেষ নোট",
     "checkoutButton": "পেমেন্ট ও বিল করুন ({{total}})",
     "checkoutModalTitle": "পেমেন্ট ও বিল নিশ্চিত করুন",
-    "completeSaleButton": "বিক্রি সম্পন্ন করুন"
+    "completeSaleButton": "বিক্রি সম্পন্ন করুন",
+    "saleDateLabel": "বিক্রির তারিখ"
   },
   "sales": {
     "historyTitle": "বিক্রির ইতিহাস ও রসিদ",
@@ -440,7 +481,8 @@
       "PARTIALLY_RETURNED": "আংশিক ফেরত",
       "RETURNED": "সম্পূর্ণ ফেরত",
       "DUE_ONLY": "বাকি আছে",
-      "CANCELLED": "বাতিল"
+      "CANCELLED": "বাতিল",
+      "ALL_DATES": "সকল তারিখ"
     },
     "statuses": {
       "COMPLETED": "সম্পন্ন",
@@ -508,7 +550,15 @@
     "cancelReasonInputLabel": "বাতিলের কারণ লিখুন *",
     "cancelReasonInputPlaceholder": "যেমন: ভুল রসিদ তৈরি হয়েছিল",
     "emptyHistoryTitle": "কোনো বিক্রির রসিদ নেই",
-    "emptyHistoryDesc": "পস (POS) কাউন্টার থেকে প্রথম বিক্রি সম্পন্ন করলে এখানে দেখা যাবে।"
+    "emptyHistoryDesc": "পস (POS) কাউন্টার থেকে প্রথম বিক্রি সম্পন্ন করলে এখানে দেখা যাবে।",
+    "invoicesCount": "টি রসিদ",
+    "totalSales": "মোট বিক্রি",
+    "saleDateLabel": "বিক্রির তারিখ",
+    "noteLabel": "নোট (ঐচ্ছিক)",
+    "notePlaceholder": "কোনো মন্তব্য লিখুন",
+    "editModalTitle": "বিক্রি তথ্য সম্পাদনা",
+    "editModalSubtitle": "বিক্রির তারিখ এবং নোট পরিবর্তন করতে পারেন।",
+    "deleteButton": "রসিদ মুছে ফেলুন / বাতিল করুন"
   },
   "receipt": {
     "title": "বিক্রয় রসিদ",

@@ -25,8 +25,10 @@ import {
   salesApi,
   type CancelSalePayload,
   type CreateCustomerPayload,
+  type CreateQuickSalePayload,
   type CreateSalePayload,
   type CreateSaleReturnPayload,
+  type UpdateSalePayload,
 } from '@/services/api/sales';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -227,6 +229,27 @@ export function useCreateSaleMutation() {
   });
 }
 
+export function useCreateQuickSaleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { payload: CreateQuickSalePayload; idempotencyKey?: string }) =>
+      salesApi.quickSale(input.payload, input.idempotencyKey),
+    onSuccess: async (res) => {
+      if (res.sale) {
+        await upsertLocalSale(res.sale);
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: salesKeys.all }),
+        queryClient.invalidateQueries({ queryKey: salesKeys.customersAll }),
+        queryClient.invalidateQueries({ queryKey: ['catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
+      ]);
+    },
+  });
+}
+
 export function useCreateSaleReturnMutation(saleId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -281,6 +304,41 @@ export function useCancelSaleMutation(saleId: string) {
           idempotencyReplayed: false,
         }),
       }),
+    onSuccess: async (res) => {
+      await upsertLocalSale(res.sale);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: salesKeys.all }),
+        queryClient.invalidateQueries({ queryKey: salesKeys.customersAll }),
+        queryClient.invalidateQueries({ queryKey: ['catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateSaleMutation(saleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateSalePayload) => salesApi.update(saleId, body),
+    onSuccess: async (res) => {
+      await upsertLocalSale(res.sale);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: salesKeys.all }),
+        queryClient.invalidateQueries({ queryKey: salesKeys.customersAll }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashbook'] }),
+      ]);
+    },
+  });
+}
+
+export function useDeleteSaleMutation(saleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input?: { reason?: string; idempotencyKey?: string }) =>
+      salesApi.delete(saleId, input?.reason, input?.idempotencyKey),
     onSuccess: async (res) => {
       await upsertLocalSale(res.sale);
       await Promise.all([

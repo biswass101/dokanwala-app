@@ -10,6 +10,7 @@ import {
   getSalesReportHandler,
 } from './reports.controller.js';
 import {
+  dashboardQuerySchema,
   dateRangeQuerySchema,
   exportReportQuerySchema,
   productsReportQuerySchema,
@@ -20,7 +21,11 @@ export const reportsRouter = Router();
 
 reportsRouter.use(requireAuth);
 
-reportsRouter.get('/dashboard', getDashboardSummaryHandler);
+reportsRouter.get(
+  '/dashboard',
+  validateRequest({ query: dashboardQuerySchema }),
+  getDashboardSummaryHandler,
+);
 
 reportsRouter.get(
   '/sales',

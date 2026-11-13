@@ -713,4 +713,60 @@ describe('Phase 4 Sales, POS, Credit Baki, Returns & Bangla Receipt UI', () => {
       );
     });
   });
+
+  it('switches to Quick Sale mode and submits lump-sum daily sale with notes and quantity', async () => {
+    mockSearchParams = {};
+    const quickSaleSpy = jest.spyOn(salesApi, 'quickSale').mockResolvedValue({
+      sale: {
+        ...sampleSale,
+        id: 'quick-sale-1',
+        receiptNumber: 'INV-20261114-0099',
+        totalPoisha: 150000,
+        paidPoisha: 150000,
+        note: 'আজকের মোট কাউন্টার বিক্রি',
+      },
+      idempotencyReplayed: false,
+    });
+
+    await renderWithQuery(<SalesPosScreen />);
+
+    // Switch to Quick Sale mode
+    const quickModeBtn = screen.getByText('⚡ সরাসরি / দৈনিক বিক্রি');
+    expect(quickModeBtn).toBeTruthy();
+    await fireEvent.press(quickModeBtn);
+
+    // Verify quick sale form rendered
+    expect(screen.getByText('⚡ সরাসরি / দৈনিক মোট বিক্রি এন্ট্রি')).toBeTruthy();
+
+    // Enter amount
+    const amountInput = screen.getByTestId('quick-sale-amount-input');
+    await fireEvent.changeText(amountInput, '1500');
+
+    // Enter quantity
+    const qtyInput = screen.getByTestId('quick-sale-qty-input');
+    await fireEvent.changeText(qtyInput, '15');
+
+    // Enter note
+    const noteInput = screen.getByTestId('quick-sale-note-input');
+    await fireEvent.changeText(noteInput, 'আজকের মোট কাউন্টার বিক্রি');
+
+    // Submit
+    const submitBtn = screen.getByTestId('quick-sale-submit-btn');
+    await fireEvent.press(submitBtn);
+
+    await waitFor(() => {
+      expect(quickSaleSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalSellingPricePoisha: 150000,
+          quantity: '15',
+          note: 'আজকের মোট কাউন্টার বিক্রি',
+          paymentMethod: 'CASH',
+          paidPoisha: 150000,
+        }),
+        undefined,
+      );
+      expect(screen.getByText('সফল বিক্রি সম্পন্ন')).toBeTruthy();
+      expect(screen.getByText(/INV-20261114-0099/)).toBeTruthy();
+    });
+  });
 });

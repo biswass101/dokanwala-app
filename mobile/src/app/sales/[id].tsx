@@ -14,7 +14,11 @@ import {
   ScreenContainer,
 } from '@/components';
 import { ReturnItemsModal } from '@/features/sales/components/ReturnItemsModal';
-import { useCancelSaleMutation, useSaleDetailQuery } from '@/features/sales/hooks/useSalesQueries';
+import {
+  useCancelSaleMutation,
+  useSaleDetailQuery,
+  useUpdateSaleMutation,
+} from '@/features/sales/hooks/useSalesQueries';
 import {
   getPaymentMethodLabel,
   getRefundMethodLabel,
@@ -38,6 +42,7 @@ export default function SaleDetailScreen() {
 
   const detailQuery = useSaleDetailQuery(saleId);
   const cancelMutation = useCancelSaleMutation(saleId ?? '');
+  const updateMutation = useUpdateSaleMutation(saleId ?? '');
 
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -46,6 +51,11 @@ export default function SaleDetailScreen() {
   const [cancelIdempotencyKey, setCancelIdempotencyKey] = useState<string>(() =>
     Crypto.randomUUID(),
   );
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editDate, setEditDate] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
 
   if (detailQuery.isLoading) {
     return (
@@ -74,7 +84,32 @@ export default function SaleDetailScreen() {
   const fromOfflineCache = detailQuery.data.fromOfflineCache;
   const statusBadge = getSaleStatusBadge(sale.status, t);
   const canReturn = sale.status === 'COMPLETED' || sale.status === 'PARTIALLY_RETURNED';
-  const canCancel = isOwner && sale.status === 'COMPLETED';
+  const canCancel = isOwner && (sale.status === 'COMPLETED' || sale.status === 'PARTIALLY_RETURNED');
+  const canEdit = isOwner && sale.status !== 'CANCELLED';
+
+  const handleOpenEdit = () => {
+    setEditError(null);
+    setEditDate(sale.soldAt.slice(0, 10));
+    setEditNote(sale.note ?? '');
+    setEditModalOpen(true);
+  };
+
+  const handleConfirmEdit = async () => {
+    setEditError(null);
+    if (editDate && !/^\d{4}-\d{2}-\d{2}$/.test(editDate)) {
+      setEditError('সঠিক তারিখ দিন (YYYY-MM-DD)');
+      return;
+    }
+    try {
+      await updateMutation.mutateAsync({
+        ...(editDate ? { soldAt: `${editDate}T12:00:00+06:00` } : {}),
+        note: editNote.trim().length > 0 ? editNote.trim() : null,
+      });
+      setEditModalOpen(false);
+    } catch (err) {
+      setEditError(getLocalizedErrorMessage(err, t));
+    }
+  };
 
   const handleConfirmCancel = async () => {
     setCancelError(null);
@@ -355,6 +390,14 @@ export default function SaleDetailScreen() {
           fullWidth
           onPress={() => router.push({ pathname: '/sales/receipt', params: { saleId: sale.id } })}
         />
+        {canEdit ? (
+          <Button
+            label={t('common.edit', { defaultValue: 'বিক্রি সম্পাদনা (তারিখ/নোট)' })}
+            variant="outline"
+            fullWidth
+            onPress={handleOpenEdit}
+          />
+        ) : null}
         {canReturn ? (
           <Button
             label={t('sales.returnButton')}
@@ -364,7 +407,7 @@ export default function SaleDetailScreen() {
         ) : null}
         {canCancel ? (
           <Button
-            label={t('sales.cancelButton')}
+            label={t('sales.cancelButton', { defaultValue: 'রসিদ মুছে ফেলুন / বাতিল করুন' })}
             variant="danger"
             fullWidth
             onPress={() => {
@@ -438,6 +481,82 @@ export default function SaleDetailScreen() {
                   variant="danger"
                   loading={cancelMutation.isPending}
                   onPress={() => void handleConfirmCancel()}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </View>
+          </View>
+        ) : null}
+      </Modal>
+
+      {/* Edit Sale Modal */}
+      <Modal
+        visible={editModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalOpen(false)}
+      >
+        {editModalOpen ? (
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(15, 23, 42, 0.55)',
+              justifyContent: 'center',
+              padding: 20,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: Colors.surface,
+                borderRadius: Layout.cardRadius,
+                padding: 18,
+                gap: 12,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
+            >
+              <AppText variant="sectionTitle" weight="bold">
+                {t('sales.editModalTitle', { defaultValue: 'বিক্রি তথ্য সম্পাদনা' })}
+              </AppText>
+              <AppText variant="caption" color={Colors.textSecondary}>
+                {t('sales.editModalSubtitle', {
+                  defaultValue: 'বিক্রির তারিখ এবং নোট পরিবর্তন করতে পারেন।',
+                })}
+              </AppText>
+
+              {editError ? (
+                <AppText variant="caption" weight="semibold" color={Colors.danger}>
+                  {editError}
+                </AppText>
+              ) : null}
+
+              <Input
+                label={t('sales.saleDateLabel', { defaultValue: 'বিক্রির তারিখ (YYYY-MM-DD)' })}
+                placeholder="YYYY-MM-DD"
+                value={editDate}
+                onChangeText={setEditDate}
+              />
+
+              <Input
+                label={t('sales.noteLabel', { defaultValue: 'নোট (ঐচ্ছিক)' })}
+                placeholder={t('sales.notePlaceholder', { defaultValue: 'কোনো মন্তব্য লিখুন' })}
+                value={editNote}
+                onChangeText={setEditNote}
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Button
+                  label={t('common.cancel')}
+                  variant="outline"
+                  disabled={updateMutation.isPending}
+                  onPress={() => setEditModalOpen(false)}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  label={t('common.save', { defaultValue: 'সংরক্ষণ করুন' })}
+                  variant="primary"
+                  loading={updateMutation.isPending}
+                  onPress={() => void handleConfirmEdit()}
                   style={{ flex: 1 }}
                 />
               </View>

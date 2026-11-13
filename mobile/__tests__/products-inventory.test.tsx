@@ -378,7 +378,7 @@ describe('Phase 3 Products, Flexible Units & Inventory Mobile UI', () => {
           nameEn: 'Karim Pan Wholesale',
           phone: '01722334455',
           address: 'যশোর',
-          notes: null,
+          note: null,
           totalPurchasedPoisha: 0,
           totalPaidPoisha: 0,
           payablePoisha: 0,

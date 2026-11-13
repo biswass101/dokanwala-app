@@ -1,5 +1,5 @@
 import { compareQuantities, type ProductDto } from '@dokanwala/shared';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import {
@@ -27,6 +27,7 @@ import {
 import { CartItemRow } from '@/features/sales/components/CartItemRow';
 import { CheckoutModal } from '@/features/sales/components/CheckoutModal';
 import { CustomerPickerModal } from '@/features/sales/components/CustomerPickerModal';
+import { QuickSaleForm } from '@/features/sales/components/QuickSaleForm';
 import { useFrequentSoldProductIdsQuery } from '@/features/sales/hooks/useSalesQueries';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { useFormattedMoney } from '@/hooks/useFormattedMoney';
@@ -39,10 +40,14 @@ export default function SalesPosScreen() {
   const { t, language } = useAppTranslation();
   const { digitStyle, formatMoney, formatDigits } = useFormattedMoney();
   const router = useRouter();
+  const params = useLocalSearchParams<{ mode?: string }>();
 
   const shop = useAuthStore((s) => s.shop);
   const allowNegativeStock = Boolean(shop?.allowNegativeStock);
 
+  const [saleMode, setSaleMode] = useState<'catalog' | 'quick'>(
+    params.mode === 'quick' ? 'quick' : 'catalog',
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -139,13 +144,67 @@ export default function SalesPosScreen() {
         </Card>
       ) : null}
 
-      {/* Bilingual Search & Category Chips */}
-      <Input
-        placeholder={t('pos.searchPlaceholder')}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        accessibilityLabel={t('pos.searchPlaceholder')}
-      />
+      {/* Sale Mode Switcher */}
+      <View
+        style={{
+          flexDirection: 'row',
+          backgroundColor: '#F1F5F9',
+          borderRadius: 10,
+          padding: 3,
+          gap: 4,
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setSaleMode('catalog')}
+          style={{
+            flex: 1,
+            paddingVertical: 7,
+            alignItems: 'center',
+            borderRadius: 8,
+            backgroundColor: saleMode === 'catalog' ? Colors.surface : 'transparent',
+          }}
+        >
+          <AppText
+            variant="body"
+            weight={saleMode === 'catalog' ? 'bold' : 'regular'}
+            color={saleMode === 'catalog' ? Colors.primary : Colors.textSecondary}
+          >
+            {t('pos.modes.catalog', { defaultValue: 'পণ্য তালিকা বিক্রি' })}
+          </AppText>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setSaleMode('quick')}
+          style={{
+            flex: 1,
+            paddingVertical: 7,
+            alignItems: 'center',
+            borderRadius: 8,
+            backgroundColor: saleMode === 'quick' ? Colors.surface : 'transparent',
+          }}
+        >
+          <AppText
+            variant="body"
+            weight={saleMode === 'quick' ? 'bold' : 'regular'}
+            color={saleMode === 'quick' ? Colors.primary : Colors.textSecondary}
+          >
+            {t('pos.modes.quick', { defaultValue: '⚡ সরাসরি / দৈনিক বিক্রি' })}
+          </AppText>
+        </Pressable>
+      </View>
+
+      {saleMode === 'quick' ? (
+        <QuickSaleForm />
+      ) : (
+        <>
+          {/* Bilingual Search & Category Chips */}
+          <Input
+            placeholder={t('pos.searchPlaceholder')}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            accessibilityLabel={t('pos.searchPlaceholder')}
+          />
 
       <ScrollView
         horizontal
@@ -389,6 +448,8 @@ export default function SalesPosScreen() {
           </View>
         )}
       </Card>
+      </>
+      )}
 
       <CustomerPickerModal
         visible={customerPickerOpen}

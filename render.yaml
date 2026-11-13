@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: dokanwala-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: HOST
+        value: 0.0.0.0
+      - key: DEFAULT_TIMEZONE
+        value: Asia/Dhaka
+      - key: TRUST_PROXY
+        value: true
+      - key: ALLOW_PUBLIC_REGISTRATION
+        value: true
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+
